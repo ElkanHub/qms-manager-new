@@ -24,6 +24,30 @@ machine yet (that's the next plan).
 | 6 | Module switchboard & proving seam (swap-test) | `..._phase6_switchboard.sql` |
 | 7 | Hardening & verification — sweeps, audit viewer | `..._phase7_verification.sql` |
 
+## Document-control core (on top of the foundation)
+
+Built from `DOCCONTROL_CONSOLIDATED_BUILD.md`, phase by phase. Migrations `..._dc_p1..p10_*`.
+
+| Phase | What |
+|-------|------|
+| 1 | Version store & identity — system-id identity, one-effective DB constraint, atomic supersession |
+| 2 | Read surface — effective-only, read-only, renderer seam (MS online), A.4 scoping |
+| 3 | Library & Master Index (module) — dept working view, tenant-wide index, fallback when off |
+| 4 | Numbering (module) — company number as metadata, going-forward uniqueness, legacy preserved |
+| 5 | Unified intake — one door, inferred routing, dispute→QA, dispatch-lock |
+| 6 | New SOP pipe — draft→endorse/QA→approve→{training\|scheduled\|active}, SoD, reject-preserves |
+| 7 | Change pipe — impact hard gate, classification→signing matrix, concurrency, waiver, reconciliation, effectiveness review, atomic supersession |
+| 8 | Retirement pipe — pre-checks, retention time-gate, destruction keeps metadata+audit |
+| 9 | Coupling modules — training + controlled-copy register via seams (safe defaults, swap-test) |
+| 10 | Periodic review, dashboards, audit oversight |
+
+**Two laws (never violated):** identity is the system id, the human number is metadata (A.3);
+configurable presentation, fixed enforcement (A.5) — no switch can weaken a guard. Guard
+checklist (spec Appendix B) is enforced server-side and covered by `supabase/tests/2x_dc_*.sql`.
+
+> Values the client QA ratifies (stored as data, not hardcoded): classification matrix,
+> retention periods, training thresholds, effectiveness-review window, review cadence.
+
 ## Setup (one command)
 
 1. Create a hosted Supabase project and a Google OAuth client.
