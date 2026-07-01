@@ -36,9 +36,14 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
             {doc.effective_from ? new Date(doc.effective_from).toISOString().slice(0, 10) : "—"}
           </p>
         </div>
-        <Link href={`/documents/${id}/history`} className="text-sm underline">
-          Version history
-        </Link>
+        <div className="flex gap-4">
+          <Link href={`/documents/${id}/history`} className="text-sm underline">
+            Version history
+          </Link>
+          <a href={`/audit/export?document=${id}`} className="text-sm underline">
+            Audit story (CSV)
+          </a>
+        </div>
       </div>
       <div className="mt-6">
         <Viewer renderer={doc.renderer} renditionRef={doc.rendition_ref} />

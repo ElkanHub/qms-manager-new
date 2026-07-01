@@ -75,3 +75,44 @@ select assert(
   'the open gate to A does not expose tenant B');
 reset role;
 select set_config('request.jwt.claims', null, true);
+
+-- ============ DATA-LEVEL ISOLATION SWEEP ============
+-- Beyond the RLS-enabled flag: as a tenant-A user, EVERY tenant-scoped table
+-- must show zero rows belonging to any other tenant — no app filter involved.
+create temp table scoped_tables on commit drop as
+  select table_name from app.tenant_scoped_tables();
+do $$
+declare tbl text; n bigint; bad text := '';
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', 'eeeeeeee-0000-0000-0000-000000000003',
+    'app_metadata', json_build_object('tenant_id', (select tenant_id from t where label='A')))::text, true);
+  execute 'set local role authenticated';
+  for tbl in select table_name from scoped_tables loop
+    execute format('select count(*) from public.%I where tenant_id is distinct from $1', tbl)
+      into n using (select tenant_id from t where label='A');
+    if n > 0 then bad := bad || tbl || ' '; end if;
+  end loop;
+  execute 'reset role';
+  perform set_config('request.jwt.claims', null, true);
+  if bad <> '' then
+    raise exception 'ISOLATION SWEEP FAILED — cross-tenant rows visible in: %', bad;
+  end if;
+end $$;
+
+-- ============ CHOKEPOINT SWEEP ============
+-- No tenant-scoped table carries a write RLS policy for org-facing roles:
+-- with FORCE RLS in front of them, every INSERT/UPDATE/DELETE must go through
+-- the audited security-definer RPCs (the single transition engine).
+select assert(
+  not exists (
+    select 1 from pg_policy p
+    join pg_class c on c.oid = p.polrelid
+    join pg_namespace ns on ns.oid = c.relnamespace
+    where ns.nspname = 'public'
+      and c.relname in (select table_name from scoped_tables)
+      and p.polcmd <> 'r'
+      and (p.polroles = '{0}'::oid[]
+           or exists (select 1 from pg_roles r where r.oid = any(p.polroles)
+                      and r.rolname in ('anon','authenticated')))),
+  'no write RLS policy exists for org roles on any tenant-scoped table (single engine)');

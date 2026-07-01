@@ -50,6 +50,28 @@ select assert_raises(
     values (now(), 'sneak', 'x', '\x00', '\x00')$$,
   'direct INSERT (bypassing app.write_audit) must be rejected');
 
+-- (3b) ...and for EVERY role, not just the privileged connection: anon,
+-- authenticated and service_role all fail to alter or remove audit rows
+-- (privileges revoked; guard trigger and RLS back-stop). Whatever the failure
+-- mode, the rows must come through untouched.
+do $$
+declare r text;
+begin
+  foreach r in array array['anon','authenticated','service_role'] loop
+    execute format('set local role %I', r);
+    -- Attempt the mutation; the failure mode (permission denied, guard trigger,
+    -- or RLS zero-row no-op) is irrelevant — the rows must survive untouched.
+    begin execute 'update audit_trail set action = ''SNEAK'''; exception when others then null; end;
+    begin execute 'delete from audit_trail';                   exception when others then null; end;
+    execute 'reset role';
+  end loop;
+end $$;
+select assert(not exists(select 1 from audit_trail where action='SNEAK'),
+  'no role rewrote any audit row');
+select assert(
+  (select count(*) from audit_trail where chain_key='22222222-2222-2222-2222-222222222222') = 2,
+  'no role removed any audit row');
+
 -- (4) action is required
 select assert_raises(
   $$select app.write_audit(null)$$,
