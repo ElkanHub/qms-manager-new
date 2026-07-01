@@ -10,6 +10,8 @@ export default async function OrgHome() {
 
   const cards = [
     { href: "/intake", title: "Start a request", desc: "New SOP, change, or retirement — one door." },
+    { href: "/queues/endorse", title: "Endorsement queue", desc: "Employee submissions awaiting HOD endorsement." },
+    { href: "/queues/qa-review", title: "QA review", desc: "Documents awaiting QA approval." },
     { href: "/library", title: "SOP Library", desc: "Browse effective documents; Master Index." },
     { href: "/org/users", title: "Users & roles", desc: "Invite, assign roles, deactivate." },
     { href: "/org/departments", title: "Departments", desc: "Create departments, assign HODs." },
