@@ -9,6 +9,7 @@ export default async function OrgHome() {
   const isQA = roles.includes("qa");
 
   const cards = [
+    { href: "/intake", title: "Start a request", desc: "New SOP, change, or retirement — one door." },
     { href: "/library", title: "SOP Library", desc: "Browse effective documents; Master Index." },
     { href: "/org/users", title: "Users & roles", desc: "Invite, assign roles, deactivate." },
     { href: "/org/departments", title: "Departments", desc: "Create departments, assign HODs." },
