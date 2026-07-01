@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppUser, getAuthUser, mfaRequired } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { bootstrapOwnerIfEligible } from "@/app/platform/actions";
 
 // Post-sign-in router. Runs the one-time owner bootstrap if eligible, then sends
@@ -24,5 +25,18 @@ export default async function Start() {
     );
   }
   if (await mfaRequired()) redirect("/mfa");
+
+  // Onboarding gate: right after acceptance, an org user runs their tenant's
+  // configured flow (if any, with at least one step) before reaching the app.
+  if (user.plane === "org" && !user.onboarded_at) {
+    const supabase = await createClient();
+    const { data: flow } = await supabase
+      .from("onboarding_flows")
+      .select("steps")
+      .eq("tenant_id", user.tenant_id)
+      .maybeSingle();
+    if (flow && Array.isArray(flow.steps) && flow.steps.length > 0) redirect("/onboarding");
+  }
+
   redirect(user.plane === "platform" ? "/platform" : "/org");
 }

@@ -15,6 +15,7 @@ export default async function PlatformHome() {
     { href: "/platform/provision", title: "Provision tenant", show: isOwner || scopes.includes("provision_tenants") },
     { href: "/platform/admins", title: "Platform admins", show: isOwner },
     { href: "/platform/switchboard", title: "Module switchboard", show: isOwner || scopes.includes("switchboard") },
+    { href: "/platform/onboarding", title: "Onboarding flows", show: isOwner || scopes.includes("switchboard") },
     { href: "/platform/access", title: "Break-glass access", show: isOwner || scopes.includes("access_gate") },
     { href: "/platform/gate-config", title: "Gate config", show: isOwner },
     { href: "/platform/verify", title: "Audit integrity", show: true },

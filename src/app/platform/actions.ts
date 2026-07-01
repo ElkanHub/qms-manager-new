@@ -79,6 +79,27 @@ export async function closeAccess(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
+// Configure a tenant's onboarding flow (the pages/fields a user runs after
+// accepting their invite). Steps are stored as data; validated array server-side.
+export async function setOnboardingFlow(formData: FormData): Promise<Result> {
+  let steps: unknown;
+  try {
+    steps = JSON.parse(String(formData.get("steps") || "[]"));
+  } catch {
+    return { ok: false, error: "Steps must be valid JSON." };
+  }
+  if (!Array.isArray(steps)) return { ok: false, error: "Steps must be a JSON array." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_onboarding_flow", {
+    p_tenant: String(formData.get("tenant_id")),
+    p_steps: steps,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/platform/onboarding");
+  return { ok: true, message: "Onboarding flow saved." };
+}
+
 export async function setModule(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_module", {

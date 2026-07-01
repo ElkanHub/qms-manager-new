@@ -11,6 +11,7 @@ export type AppUser = {
   plane: "org" | "platform";
   initial_role: string | null;
   status: "active" | "deactivated";
+  onboarded_at: string | null;
 };
 
 // The authenticated auth user (or null). Session freshness is kept by middleware.
