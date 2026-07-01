@@ -66,6 +66,22 @@ export async function requestModuleChange(formData: FormData): Promise<Result> {
   return { ok: true, message: "Request sent to the platform." };
 }
 
+// QA defines the company's SOP-number format (metadata over the system id, A.3).
+// QA-owned; server enforces is_qa. Format is validated JSON.
+export async function setNumberingFormat(formData: FormData): Promise<Result> {
+  let format: unknown;
+  try {
+    format = JSON.parse(String(formData.get("format") || "{}"));
+  } catch {
+    return { ok: false, error: "Format must be valid JSON." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_numbering_format", { p_format: format });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/org/numbering");
+  return { ok: true, message: "Numbering format saved." };
+}
+
 // QA decides a platform break-glass request (consent mode). QA-of-tenant only,
 // enforced server-side. reason is required and audited.
 export async function decideAccess(formData: FormData): Promise<Result> {

@@ -9,9 +9,11 @@ export default async function OrgHome() {
   const isQA = roles.includes("qa");
 
   const cards = [
+    { href: "/library", title: "SOP Library", desc: "Browse effective documents; Master Index." },
     { href: "/org/users", title: "Users & roles", desc: "Invite, assign roles, deactivate." },
     { href: "/org/departments", title: "Departments", desc: "Create departments, assign HODs." },
     { href: "/org/invite", title: "Send invitation", desc: "Invite a new org user." },
+    { href: "/org/numbering", title: "Numbering", desc: "Define your SOP-number format (QA)." },
     { href: "/org/modules", title: "Modules", desc: "See enabled modules (read-only)." },
     { href: "/audit", title: "Audit trail", desc: "Your organization's audit log." },
   ];
