@@ -1,0 +1,36 @@
+# Supabase project config. `project_id` is the local shadow name; the real
+# project is linked via `supabase link` using SUPABASE_PROJECT_REF (see .env.example).
+project_id = "qms-manager"
+
+[db]
+major_version = 15
+
+[db.migrations]
+# Migrations run in filename order. Every schema change is a migration — never a
+# manual edit (Phase 0 guard).
+schema_paths = []
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+# Invite-only: no public sign-up (rule 0.5). Enforced in app + DB; this mirrors it
+# at the Supabase Auth layer so the provider itself won't mint uninvited accounts.
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+[auth.mfa]
+# Mandatory MFA (Phase 3). TOTP enrolment enabled; enforcement is via AAL2 checks
+# in the app/DB. Verified factors required before controlled actions.
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.external.google]
+enabled = true
+# These read from env; set the real values in the Supabase dashboard for hosted.
+client_id = "env(GOOGLE_OAUTH_CLIENT_ID)"
+secret = "env(GOOGLE_OAUTH_CLIENT_SECRET)"

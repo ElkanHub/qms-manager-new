@@ -1,0 +1,4 @@
+-- Seed — runs after migrations on `supabase db reset` / initial setup.
+-- The platform-owner bootstrap (the one account not created by invite) is added
+-- in Phase 5. Until then this is intentionally empty so a fresh DB is clean.
+-- ponytail: no demo data seeded — a compliance substrate should start empty.

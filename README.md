@@ -1,0 +1,56 @@
+# QMS Manager — Platform Foundation
+
+The GxP-compliant substrate every later module (document-control core included)
+plugs into. Built strictly from `FOUNDATIONS.md` and `FOUNDATION_BUILD_PLAN.md`,
+phase by phase. This repo is the **foundation only** — no document-control state
+machine yet (that's the next plan).
+
+## Stack
+
+- **Next.js 15** (App Router, TypeScript) — the app + screens.
+- **Supabase / Postgres** — data, RLS isolation, auth (Google SSO + MFA), RPCs.
+- Migrations in `supabase/migrations/` — ordered, append-only. Never edit a shipped one.
+
+## What's built (foundation phases)
+
+| Phase | What | Migration |
+|-------|------|-----------|
+| 0 | Scaffold, env, migration tooling, CI, test harness | `..._phase0_baseline.sql` |
+| 1 | Audit substrate — append-only, hash-chained, total | `..._phase1_audit.sql` |
+| 2 | Tenancy & org model — RLS isolation from table one | `..._phase2_tenancy.sql` |
+| 3 | Identity, invite & auth — Google SSO + MFA, invite-only | `..._phase3_identity.sql` |
+| 4 | Org governance & roles — QA root, SoD primitive | `..._phase4_org_governance.sql` |
+| 5 | Platform governance & break-glass gate | `..._phase5_platform_governance.sql` |
+| 6 | Module switchboard & proving seam (swap-test) | `..._phase6_switchboard.sql` |
+| 7 | Hardening & verification — sweeps, audit viewer | `..._phase7_verification.sql` |
+
+## Setup (one command)
+
+1. Create a hosted Supabase project and a Google OAuth client.
+2. `cp .env.example .env.local` and fill in **every** value (all credentials are yours to provide).
+3. `npm install`
+4. `npm run setup` — links the project, pushes all migrations, applies the seed.
+5. `npm run db:test` — runs the SQL substrate tests against your DB.
+6. `npm run dev` — start the app.
+
+> **No Docker here?** The local Supabase stack (`supabase start`) needs Docker. This
+> setup targets your **hosted** project instead, so no Docker is required locally.
+> CI (`.github/workflows/ci.yml`) uses the local stack because runners have Docker.
+
+## Testing
+
+- **SQL substrate tests** — `supabase/tests/*.sql`, run by `node scripts/run-sql-tests.mjs`
+  (each file rolled back; `assert()` raises on failure). These are the executable
+  acceptance criteria for the DB guards.
+- **App tests** — `npm test` (vitest).
+- **Everything** — CI runs migrations + both suites on every push.
+
+## The standing law (cross-cutting rules — apply everywhere)
+
+1. Nothing escapes the audit trail (every controlled action writes audit).
+2. Tenancy on every controlled row (`tenant_id`, never null, never mutable; RLS enforces).
+3. Guards are server-side (DB/RPC), never UI-only.
+4. Configurable at the edges, fixed at the core (modules switch; guards never).
+5. Invited, never self-signed-up.
+6. Deactivate, never delete (attribution survives forever).
+7. Every seam ships with a stub that passes the swap-test.

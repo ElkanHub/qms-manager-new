@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # Faithful DB: the Supabase local stack has the real anon/authenticated/
+      # service_role roles + extensions schema that our migrations depend on.
+      - name: Start Supabase (applies migrations + seed)
+        run: npx supabase start
+
+      - name: Verify migrations reset cleanly
+        run: npx supabase db reset --no-seed=false
+
+      - name: SQL substrate tests
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: node scripts/run-sql-tests.mjs
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: App tests
+        run: npm test
+
+      - name: Stop Supabase
+        if: always()
+        run: npx supabase stop
