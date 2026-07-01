@@ -15,21 +15,36 @@ create temp table d on commit drop as
   select 'a'::text lbl, * from app.create_document(
     (select tenant_id from t),(select org_id from t),(select qa_department_id from t),
     'Calibration SOP', null, gen_random_uuid(), gen_random_uuid());
-insert into d select 'dup1', * from app.create_document(
+-- Historical duplicates enter as LEGACY imports (P4's going-forward uniqueness
+-- exempts them; a non-legacy duplicate is refused — proven in 24_dc_p4).
+insert into d select 'dup1', * from app.import_legacy_document(
   (select tenant_id from t),(select org_id from t),(select qa_department_id from t),
   'Doc One', 'DUP-1', gen_random_uuid(), gen_random_uuid());
-insert into d select 'dup2', * from app.create_document(
+insert into d select 'dup2', * from app.import_legacy_document(
   (select tenant_id from t),(select org_id from t),(select qa_department_id from t),
   'Doc Two', 'DUP-1', gen_random_uuid(), gen_random_uuid());
 
 select assert((select count(distinct document_id) from d) = 3, 'three distinct system ids minted');
 select assert((select count(*) from documents where document_number='DUP-1') = 2,
-  'duplicate human numbers are allowed (migration reality) with distinct identities');
+  'duplicate human numbers survive on legacy imports (migration reality) with distinct identities');
 
 -- Changing a human number leaves identity + version chain intact.
 update documents set document_number = 'RENUMBERED' where id = (select document_id from d where lbl='a');
 select assert((select count(*) from document_versions where document_id=(select document_id from d where lbl='a')) = 1,
   'renumbering does not touch the version chain');
+
+-- Renaming a department breaks nothing either: references key on ids, and the
+-- audit chain stays intact after both renames.
+update departments set name = 'Quality Assurance (renamed)'
+  where id = (select qa_department_id from t);
+select assert((select count(*) from documents
+    where department_id = (select qa_department_id from t)) = 3,
+  'department rename breaks no document references');
+select assert((select count(*) from document_versions
+    where department_id = (select qa_department_id from t)) = 3,
+  'department rename breaks no version references');
+select assert((select ok from app.verify_audit_chain((select tenant_id from t)::text)),
+  'audit chain verifies after renumber + department rename');
 
 -- (2) Make version effective (rev 00) with a controlled effective date.
 select pg_temp.approve((select version_id from d where lbl='a'));
@@ -77,3 +92,28 @@ select assert(exists(select 1 from audit_trail where action='version.effective'
   and chain_key=(select tenant_id from t)::text), 'effective transitions are audited');
 select assert(exists(select 1 from audit_trail where action='version.superseded'),
   'supersession is audited');
+
+-- (5) Chokepoint: an org user has no direct write path to status columns —
+-- select-only grants and no write RLS policy. Whether the attempt raises
+-- (permission denied) or no-ops (RLS zero rows), nothing may change: the only
+-- working write paths are the audited transition RPCs.
+do $$
+declare v_doc uuid;
+begin
+  select document_id into v_doc from d where lbl='a';
+  perform set_config('request.jwt.claims',
+    json_build_object('sub','99990000-0000-0000-0000-000000000001',
+      'app_metadata', json_build_object('tenant_id',(select tenant_id from t)))::text, true);
+  execute 'set local role authenticated';
+  begin execute format('update documents set status=''retired'' where id=%L', v_doc);
+  exception when others then null; end;
+  begin execute format('update document_versions set status=''draft'' where document_id=%L', v_doc);
+  exception when others then null; end;
+  execute 'reset role';
+  perform set_config('request.jwt.claims', null, true);
+end $$;
+select assert((select status from documents where id=(select document_id from d where lbl='a')) = 'active',
+  'direct UPDATE of documents.status by an org user changes nothing (chokepoint)');
+select assert(not exists(select 1 from document_versions
+    where document_id=(select document_id from d where lbl='a') and status='draft'),
+  'direct UPDATE of document_versions.status by an org user changes nothing (chokepoint)');
