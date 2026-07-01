@@ -37,7 +37,4 @@ run(`npx supabase link --project-ref ${ref}`);
 console.log("→ Pushing migrations...");
 run("npx supabase db push");
 
-console.log("→ Applying seed...");
-run(`npx supabase db push --include-seed`);
-
 console.log("\n✓ Environment is up. Run `npm run db:test` to verify the substrate.");

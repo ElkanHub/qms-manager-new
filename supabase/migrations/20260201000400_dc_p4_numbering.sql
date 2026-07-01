@@ -108,6 +108,6 @@ begin
 end; $$;
 
 grant execute on function app.next_document_number(uuid), app.apply_number(uuid, uuid),
-  app.import_legacy_document(uuid,uuid,uuid,text,text,uuid,timestamptz) to service_role;
+  app.import_legacy_document(uuid,uuid,uuid,text,text,uuid,uuid,timestamptz) to service_role;
 revoke all on function public.set_numbering_format(jsonb) from public;
 grant execute on function public.set_numbering_format(jsonb) to authenticated, service_role;
