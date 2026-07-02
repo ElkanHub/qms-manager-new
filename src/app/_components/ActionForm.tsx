@@ -1,12 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 type Action = (formData: FormData) => Promise<Result>;
 
 // Thin form wrapper that runs a server action and surfaces its ok/error/message.
 // One component reused by every org/platform form so error handling is consistent.
+// Errors: inline destructive Alert + toast. Success: toast (+ inline confirmation).
 export function ActionForm({
   action,
   submitLabel,
@@ -21,19 +26,29 @@ export function ActionForm({
     null,
   );
 
+  // Toast on each settled result (ref guards against re-firing on re-render).
+  const lastToasted = useRef<Result | null>(null);
+  useEffect(() => {
+    if (!state || state === lastToasted.current) return;
+    lastToasted.current = state;
+    if (state.ok) toast.success(state.message ?? "Done.");
+    else toast.error(state.error);
+  }, [state]);
+
   return (
     <form action={formAction} className="flex flex-col gap-3">
       {children}
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-      >
+      <Button type="submit" disabled={pending} className="self-start">
+        {pending && <Loader2 className="animate-spin" />}
         {submitLabel}
-      </button>
-      {state && !state.ok && <p className="text-sm text-red-600">{state.error}</p>}
+      </Button>
+      {state && !state.ok && (
+        <Alert variant="destructive">
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
+      )}
       {state && state.ok && (
-        <p className="break-all text-sm text-green-700">{state.message ?? "Done."}</p>
+        <p className="break-all text-sm text-status-effective">{state.message ?? "Done."}</p>
       )}
     </form>
   );
