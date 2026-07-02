@@ -2,10 +2,119 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light dark;
+/* ============================================================================
+   Token contract. Branding lands HERE ONLY — replace values, never touch a
+   component. Layer A = shadcn semantic tokens (new-york / neutral). Layer B =
+   QMS status tones. No component may hardcode a hex/neutral-* for anything
+   semantic (UI_BUILD_PLAN §2.2, §11).
+   ============================================================================ */
+
+@layer base {
+  :root {
+    /* Layer A — shadcn semantic tokens (light) */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --radius: 0.5rem;
+
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Layer B — QMS status tones (light). Used as bg-status-x/15 text-status-x. */
+    --status-draft: 0 0% 45%;
+    --status-review: 38 92% 45%;
+    --status-approved: 172 66% 38%;
+    --status-effective: 142 71% 38%;
+    --status-blocked: 25 95% 48%;
+    --status-scheduled: 217 91% 55%;
+    --status-terminal: 215 16% 47%;
+    --status-retention: 271 60% 52%;
+    --status-destroyed: 0 84% 52%;
+  }
+
+  .dark {
+    /* Layer A — shadcn semantic tokens (dark) */
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Layer B — QMS status tones (dark, brightened for contrast) */
+    --status-draft: 0 0% 65%;
+    --status-review: 38 92% 60%;
+    --status-approved: 172 60% 55%;
+    --status-effective: 142 65% 55%;
+    --status-blocked: 25 95% 62%;
+    --status-scheduled: 217 91% 68%;
+    --status-terminal: 215 20% 65%;
+    --status-retention: 271 70% 70%;
+    --status-destroyed: 0 84% 68%;
+  }
 }
 
-body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
 }
