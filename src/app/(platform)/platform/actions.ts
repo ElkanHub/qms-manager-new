@@ -123,3 +123,15 @@ export async function setModule(formData: FormData): Promise<Result> {
   revalidatePath("/platform/switchboard");
   return { ok: true };
 }
+
+export async function setAiGatewayConfig(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_ai_gateway_config", {
+    p_provider: String(formData.get("provider") || "gemini"),
+    p_model: String(formData.get("model") || "gemini-2.5-flash"),
+    p_settings: {},
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/platform/ai-gateway");
+  return { ok: true, message: "Gateway configuration saved." };
+}

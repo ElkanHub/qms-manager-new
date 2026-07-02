@@ -1,165 +1,136 @@
+import Link from "next/link";
 import { requireOrgUser, getMyRoles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ActionForm } from "@/app/_components/ActionForm";
-import { assignTraining, completeTraining } from "@/app/(org)/oversight/actions";
 import { PageHeader } from "@/components/app/page-header";
 import { SectionCard } from "@/components/app/section-card";
 import { StatusBadge } from "@/components/app/status-badge";
 import { EmptyState } from "@/components/app/empty-state";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { GraduationCap } from "lucide-react";
+import { Award, Download, GraduationCap } from "lucide-react";
 
-// D-TRAINING — assign training on effective documents, record completion, and show
-// per-document threshold status. Stragglers (still 'assigned') are flagged; the core
-// blocks release until the threshold is met (enforced server-side).
-export default async function Training() {
-  const user = await requireOrgUser();
+type Row = {
+  assignment_id: string;
+  status: string;
+  progress_pct: number;
+  due_at: string | null;
+  assigned_at: string;
+  completed_at: string | null;
+  overdue: boolean;
+  document_number: string | null;
+  document_title: string;
+  revision: number | null;
+  package_id: string | null;
+  certificate_uid: string | null;
+  score: number | null;
+};
+
+// T-MY-TRAINING (plan §10): the trainee's home — assignments with progress
+// bars, due dates, scores, and the certificate archive.
+export default async function MyTraining() {
+  await requireOrgUser();
   const roles = await getMyRoles();
-  // Manage tab visibility mirrors the original screen (qa OR trainer); the RPC
-  // still enforces authority server-side.
-  const isQa = roles.includes("qa") || roles.includes("trainer");
+  const isTrainer = roles.includes("qa") || roles.includes("trainer");
   const supabase = await createClient();
+  const { data } = await supabase.rpc("my_training");
+  const rows = ((data as Row[] | null) ?? []);
 
-  const { data: docs } = await supabase
-    .from("documents")
-    .select("id, title, document_number")
-    .eq("status", "active")
-    .order("document_number");
-  const { data: users } = await supabase.from("users").select("id, email, full_name").order("email");
-  const { data: assignments } = await supabase
-    .from("training_assignments")
-    .select("id, document_id, user_id, status, completed_at")
-    .order("assigned_at", { ascending: false });
-
-  const docLabel = (id: string) => {
-    const d = docs?.find((x) => x.id === id);
-    return d ? `${d.document_number ?? "—"} · ${d.title}` : id;
-  };
-  const userLabel = (id: string) => {
-    const u = users?.find((x) => x.id === id);
-    return u ? (u.full_name ?? u.email) : id;
-  };
-
-  const mine = (assignments ?? []).filter((a) => a.user_id === user.id);
-
-  // per-document completed/total (+ stragglers still 'assigned')
-  const stats = new Map<string, { done: number; total: number; stragglers: string[] }>();
-  for (const a of assignments ?? []) {
-    const s = stats.get(a.document_id) ?? { done: 0, total: 0, stragglers: [] };
-    s.total += 1;
-    if (a.status === "completed") s.done += 1;
-    else s.stragglers.push(a.user_id);
-    stats.set(a.document_id, s);
-  }
+  const open = rows.filter((r) => r.status !== "completed");
+  const done = rows.filter((r) => r.status === "completed");
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-2">
+    <main className="mx-auto max-w-3xl space-y-6 p-2">
       <PageHeader
-        title="Training"
-        description="Your assignments and, for QA, training oversight."
+        title="My training"
+        description="Your assigned trainings, progress and certificates."
+        actions={
+          isTrainer ? (
+            <div className="flex gap-2">
+              <Button variant="outline" asChild>
+                <Link href="/training/packages">Packages</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/training/dashboard">Dashboard</Link>
+              </Button>
+            </div>
+          ) : undefined
+        }
       />
 
-      <Tabs defaultValue="mine">
-        <TabsList>
-          <TabsTrigger value="mine">My training</TabsTrigger>
-          {isQa && <TabsTrigger value="manage">Manage</TabsTrigger>}
-        </TabsList>
-
-        <TabsContent value="mine" className="space-y-3">
-          {mine.length === 0 ? (
-            <EmptyState icon={GraduationCap} message="No training assigned to you right now." />
-          ) : (
-            mine.map((a) => (
-              <SectionCard key={a.id}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-sm font-medium">{docLabel(a.document_id)}</span>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge value={a.status} kind="training" />
-                    {a.status === "assigned" && (
-                      <ActionForm action={completeTraining} submitLabel="Mark complete">
-                        <input type="hidden" name="assignment_id" value={a.id} />
-                      </ActionForm>
+      <SectionCard title="Assigned to you">
+        {open.length === 0 ? (
+          <EmptyState
+            icon={GraduationCap}
+            message="Nothing assigned — trainings assigned to you appear here with a progress bar and due date."
+          />
+        ) : (
+          <ul className="divide-y">
+            {open.map((r) => (
+              <li key={r.assignment_id} className="flex items-center gap-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">{r.document_number ?? "—"}</span>
+                    <StatusBadge value={r.overdue ? "overdue" : r.status} kind="training" dot />
+                  </div>
+                  <p className="truncate font-medium">{r.document_title}</p>
+                  <div className="mt-1 flex items-center gap-3">
+                    <Progress value={r.progress_pct} className="h-1.5 w-40" aria-label="Slide progress" />
+                    <span className="text-xs tabular-nums text-muted-foreground">{r.progress_pct}%</span>
+                    {r.due_at && (
+                      <span className="text-xs text-muted-foreground">
+                        due {new Date(r.due_at).toISOString().slice(0, 10)}
+                      </span>
                     )}
                   </div>
                 </div>
-              </SectionCard>
-            ))
-          )}
-        </TabsContent>
-
-        {isQa && (
-          <TabsContent value="manage" className="space-y-6">
-            <SectionCard title="Assign training" description="Assign an effective document to a user.">
-              <ActionForm action={assignTraining} submitLabel="Assign">
-                <div className="space-y-1.5">
-                  <Label htmlFor="document_id">Document</Label>
-                  <Select name="document_id" required>
-                    <SelectTrigger id="document_id">
-                      <SelectValue placeholder="Select a document…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(docs ?? []).map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {docLabel(d.id)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="user_id">User</Label>
-                  <Select name="user_id" required>
-                    <SelectTrigger id="user_id">
-                      <SelectValue placeholder="Select a user…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(users ?? []).map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {userLabel(u.id)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </ActionForm>
-            </SectionCard>
-
-            <SectionCard title="Threshold status" description="Completion per document; stragglers still owe training.">
-              {stats.size === 0 ? (
-                <EmptyState icon={GraduationCap} message="No training has been assigned yet." />
-              ) : (
-                <div className="space-y-5">
-                  {[...stats.entries()].map(([docId, s]) => (
-                    <div key={docId} className="space-y-2">
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="font-medium">{docLabel(docId)}</span>
-                        <span className="text-muted-foreground">
-                          {s.done}/{s.total} trained
-                        </span>
-                      </div>
-                      <Progress value={s.total ? (s.done / s.total) * 100 : 0} />
-                      {s.stragglers.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Stragglers: {s.stragglers.map(userLabel).join(", ")}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionCard>
-          </TabsContent>
+                {r.package_id ? (
+                  <Button size="sm" asChild>
+                    <Link href={`/training/learn/${r.assignment_id}`}>
+                      {r.status === "assigned" ? "Start" : "Resume"}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Badge variant="outline">recorded manually</Badge>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
-      </Tabs>
-    </div>
+      </SectionCard>
+
+      <SectionCard title="Completed — certificate archive">
+        {done.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Passed trainings and their certificates land here.</p>
+        ) : (
+          <ul className="divide-y">
+            {done.map((r) => (
+              <li key={r.assignment_id} className="flex items-center gap-4 py-3">
+                <Award className="size-4 text-status-effective" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {r.document_number ?? "—"} · {r.document_title}
+                    {r.revision != null && (
+                      <span className="text-muted-foreground"> · rev {String(r.revision).padStart(2, "0")}</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.completed_at ? new Date(r.completed_at).toISOString().slice(0, 10) : ""}
+                    {r.score != null && ` · ${r.score}%`}
+                  </p>
+                </div>
+                {r.certificate_uid && (
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={`/training/certificates/${r.certificate_uid}`} download>
+                      <Download /> PDF
+                    </a>
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+    </main>
   );
 }
