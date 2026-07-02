@@ -118,3 +118,14 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+@layer utilities {
+  /* Hide the scrollbar while keeping scroll behavior (used on the sidebar). */
+  .no-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge legacy */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chromium/Safari */
+  }
+}
