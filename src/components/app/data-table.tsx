@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -115,6 +117,7 @@ export function DataTable<TData, TValue>({
                       : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
+                {onRowHref && <TableHead className="w-8" />}
               </TableRow>
             ))}
           </TableHeader>
@@ -133,12 +136,32 @@ export function DataTable<TData, TValue>({
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
+                    {onRowHref && (
+                      <TableCell className="w-8 py-2.5">
+                        {href && (
+                          // The row's real anchor (§9): keyboard-focusable,
+                          // middle-clickable, announced as a link. The row
+                          // onClick is a pointer convenience on top of it.
+                          <Link
+                            href={href}
+                            className="flex text-muted-foreground hover:text-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ChevronRight className="size-4" />
+                            <span className="sr-only">Open</span>
+                          </Link>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length + (onRowHref ? 1 : 0)}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   No results for the current filter.
                 </TableCell>
               </TableRow>

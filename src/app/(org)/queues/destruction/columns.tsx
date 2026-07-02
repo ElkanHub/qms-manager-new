@@ -85,6 +85,9 @@ export const columns: ColumnDef<DestructionRow>[] = [
           retentionNote={r.retentionNote}
           action={destroyVersion}
           hiddenFields={{ version_id: r.id }}
+          extraFields={[
+            { name: "method", label: "Destruction method", placeholder: "e.g. secure-shred" },
+          ]}
           trigger={
             <Button variant="destructive" size="sm">
               Destroy…

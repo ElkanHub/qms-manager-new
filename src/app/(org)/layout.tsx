@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { requireOrgUser, getMyRoles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getQueueCounts } from "@/lib/queue-counts";
@@ -10,11 +11,13 @@ import { AppHeader } from "@/components/app/app-header";
 // display-only; each page's RPCs re-check authority.
 export default async function OrgLayout({ children }: { children: React.ReactNode }) {
   const user = await requireOrgUser();
-  const [roles, counts, supabase] = await Promise.all([
+  const [roles, counts, supabase, cookieStore] = await Promise.all([
     getMyRoles(),
     getQueueCounts(),
     createClient(),
+    cookies(),
   ]);
+  const sidebarOpen = cookieStore.get("sidebar_state")?.value !== "false";
 
   const [{ data: org }, { data: docs }] = await Promise.all([
     supabase.from("organizations").select("name").eq("tenant_id", user.tenant_id).maybeSingle(),
@@ -33,7 +36,7 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
   }));
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={sidebarOpen}>
       <AppSidebar plane="org" orgName={org?.name ?? "QMS Manager"} roles={roles} counts={counts} />
       <SidebarInset>
         <AppHeader
