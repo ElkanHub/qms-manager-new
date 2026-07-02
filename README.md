@@ -63,11 +63,13 @@ checklist (spec Appendix B) is enforced server-side and covered by `supabase/tes
 
 ## Testing
 
-- **SQL substrate tests** — `supabase/tests/*.sql`, run by `node scripts/run-sql-tests.mjs`
-  (each file rolled back; `assert()` raises on failure). These are the executable
-  acceptance criteria for the DB guards.
-- **App tests** — `npm test` (vitest).
-- **Everything** — CI runs migrations + both suites on every push.
+- **SQL substrate tests** — `supabase/tests/*.sql`, run by `npm test`
+  (`scripts/run-sql-tests.mjs`; each file rolled back; `assert()` raises on failure).
+  These are the executable acceptance criteria for the DB guards, SoD, RLS isolation,
+  audit immutability and the workflow pipes — the real test suite.
+- **Pre-deployment gate** — CI (`.github/workflows/ci.yml`) applies the migration
+  chain from zero, runs the SQL suite, typechecks, and builds the app on every PR
+  and on pushes to main.
 
 ## The standing law (cross-cutting rules — apply everywhere)
 
