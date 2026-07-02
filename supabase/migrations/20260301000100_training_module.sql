@@ -204,6 +204,7 @@ create table if not exists public.training_packages (
   pass_mark           int check (pass_mark is null or pass_mark between 1 and 100),  -- null → tenant setting
   state               text not null default 'generating'
                       check (state in ('generating','draft_review','approved','assigned','closed')),
+  source_text         text,   -- the grounding excerpt generation ran on (provenance + regeneration)
   created_by          uuid not null,
   created_at          timestamptz not null default now(),
   approved_by         uuid,
@@ -400,7 +401,8 @@ end; $$;
 -- trainer. Slides/questions land as drafts with ai_draft provenance retained;
 -- the provenance log row and the audit entry are written in the same call.
 create or replace function public.store_ai_draft(
-  p_package uuid, p_slides jsonb, p_questions jsonb, p_provider text, p_model text)
+  p_package uuid, p_slides jsonb, p_questions jsonb, p_provider text, p_model text,
+  p_source_text text default null)
 returns void language plpgsql security definer set search_path = app, public as $$
 declare pk public.training_packages; v_caller uuid := auth.uid(); s jsonb; q jsonb; i int := 0;
 begin
@@ -434,7 +436,9 @@ begin
               (q->>'correct_index')::int, q->>'explanation', q);
   end loop;
 
-  update public.training_packages set state = 'draft_review' where id = p_package;
+  update public.training_packages
+    set state = 'draft_review', source_text = coalesce(p_source_text, source_text)
+    where id = p_package;
   insert into public.ai_gateway_log(tenant_id, operation, provider, model_version, requested_by,
       document_version_id, package_id, status, output_ref)
     values (pk.tenant_id, 'generate_package', p_provider, p_model, v_caller,
@@ -468,6 +472,23 @@ begin
   perform app.write_audit('training.ai_failed', v_caller, null, pk.tenant_id, pk.org_id, pk.department_id,
     'training_package', p_package::text, null, jsonb_build_object('provider', p_provider, 'error', p_error),
     null, 'T-PACKAGES');
+end; $$;
+
+-- Any other gateway operation (e.g. regenerating one question) logs its
+-- provenance through the same append-only trail.
+create or replace function public.log_ai_call(
+  p_package uuid, p_operation text, p_provider text, p_model text, p_output_ref text default null)
+returns void language plpgsql security definer set search_path = app, public as $$
+declare pk public.training_packages; v_caller uuid := auth.uid();
+begin
+  select * into pk from public.training_packages where id = p_package;
+  if pk.id is null or pk.tenant_id is distinct from public.current_tenant_id() then
+    raise exception 'log_ai_call: no such package'; end if;
+  if not app.is_trainer(v_caller) then raise exception 'log_ai_call: trainer/QA only'; end if;
+  insert into public.ai_gateway_log(tenant_id, operation, provider, model_version, requested_by,
+      document_version_id, package_id, status, output_ref)
+    values (pk.tenant_id, p_operation, p_provider, p_model, v_caller,
+            pk.document_version_id, p_package, 'success', p_output_ref);
 end; $$;
 
 -- Editing — draft_review only (the trainer polishing the draft, §5/§6).
@@ -1066,12 +1087,12 @@ returns jsonb language sql stable security definer set search_path = app, public
   select coalesce(jsonb_agg(x order by x->>'status' desc, x->>'number'), '[]'::jsonb) from (
     select jsonb_build_object(
         'document_id', d.id, 'number', d.document_number, 'title', d.title, 'status', d.status,
-        'version_id', v.id, 'revision', v.revision_number,
+        'version_id', v.id, 'revision', v.revision_number, 'reason_for_change', v.reason_for_change,
         'has_open_package', exists (select 1 from public.training_packages p
                                     where p.document_version_id = v.id and p.state <> 'closed')) as x
     from public.documents d
     join lateral (
-      select id, revision_number from public.document_versions v
+      select id, revision_number, reason_for_change from public.document_versions v
       where v.document_id = d.id
         and ((d.status = 'pending_training' and v.status = 'approved')
           or (d.status = 'active' and v.status = 'effective'))
@@ -1085,8 +1106,8 @@ do $$
 declare fn text;
 begin
   foreach fn in array array[
-    'create_training_package(uuid,text,int,int)','store_ai_draft(uuid,jsonb,jsonb,text,text)',
-    'log_ai_failure(uuid,text,text,text)',
+    'create_training_package(uuid,text,int,int)','store_ai_draft(uuid,jsonb,jsonb,text,text,text)',
+    'log_ai_failure(uuid,text,text,text)','log_ai_call(uuid,text,text,text,text)',
     'update_training_slide(uuid,text,text)','add_training_slide(uuid,text,text)',
     'delete_training_slide(uuid)','reorder_training_slides(uuid,uuid[])',
     'update_training_question(uuid,text,jsonb,int,text)','add_training_question(uuid,text,jsonb,int,text)',

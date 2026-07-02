@@ -71,6 +71,18 @@ checklist (spec Appendix B) is enforced server-side and covered by `supabase/tes
   chain from zero, runs the SQL suite, typechecks, and builds the app on every PR
   and on pushes to main.
 
+## Training module (first module on the seam)
+
+Built from `TRAINING_MODULE_BUILD_PLAN.md`. Migration `..._training_module.sql`;
+acceptance test `supabase/tests/33_training_module.sql` runs the plan's §12
+walkthrough end to end. AI-assisted (slides + questions drafted by the AI
+Gateway — Gemini by default, platform-configured at `/platform/ai-gateway`,
+key via `GEMINI_API_KEY` env only), with the non-negotiable human gate: a
+trainer reviews, edits and approves every AI draft before it can be assigned.
+Version-specific packages, server-side grading, append-only attempts, branded
+PDF certificates (verifiable by uid), threshold feeding seam B, and the
+execution block for untrained users. Module off → the core's safe default.
+
 ## The standing law (cross-cutting rules — apply everywhere)
 
 1. Nothing escapes the audit trail (every controlled action writes audit).

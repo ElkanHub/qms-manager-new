@@ -43,6 +43,12 @@ const toneClass: Record<Tone, string> = {
 // retirement, intake, approval requests, training, copies, and shared lifecycle
 // states (§2.2 tone groupings).
 const statusMap: Record<string, { tone: Tone; label: string }> = {
+  // training module (packages + assignments)
+  generating: { tone: "scheduled", label: "Generating" },
+  draft_review: { tone: "review", label: "Draft review" },
+  in_progress: { tone: "scheduled", label: "In progress" },
+  awaiting_assessment: { tone: "review", label: "Awaiting assessment" },
+  overdue: { tone: "blocked", label: "Overdue" },
   // documents
   draft: { tone: "draft", label: "Draft" },
   in_review: { tone: "review", label: "In review" },
