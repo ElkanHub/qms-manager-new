@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { env } from "@/lib/env";
+import { Button } from "@/components/ui/button";
 
 // Google button that returns to this accept page (token preserved) after OAuth.
 export function SignInToAccept({ token }: { token: string }) {
@@ -18,13 +19,10 @@ export function SignInToAccept({ token }: { token: string }) {
   }
   return (
     <>
-      <button
-        onClick={go}
-        className="rounded-md border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium hover:bg-neutral-50"
-      >
+      <Button onClick={go} variant="outline">
         Continue with Google to accept
-      </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </>
   );
 }

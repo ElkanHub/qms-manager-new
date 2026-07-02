@@ -9,8 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "node scripts/run-sql-tests.mjs",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
     "db:test": "supabase db reset && node scripts/run-sql-tests.mjs",
@@ -65,7 +64,6 @@
     "postcss": "^8.5.0",
     "supabase": "^2.109.0",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
+    "typescript": "^5.7.0"
   }
 }

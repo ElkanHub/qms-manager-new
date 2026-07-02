@@ -57,7 +57,7 @@ export default function Mfa() {
       document.cookie = `qms_device=${token}; Max-Age=${env.mfaTrustedDeviceDays() * 86400}; Path=/; SameSite=Lax`;
       await supabase.rpc("remember_device", { p_device_hash: hash, p_days: env.mfaTrustedDeviceDays() });
     }
-    router.push("/account");
+    router.push("/start");
   }
 
   function fail(msg: string) {

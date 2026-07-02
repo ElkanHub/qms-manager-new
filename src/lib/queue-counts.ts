@@ -1,10 +1,11 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 // Shared RLS-scoped queue counts for the sidebar badges (UI_BUILD_PLAN §4.2).
 // Same filters the queue pages use; counts are head-only. RLS scopes rows to the
 // caller, so a non-QA/HOD user simply sees zeros (and those nav items are hidden).
 // "Actionable now" for destruction/periodic = past retention / overdue.
-export async function getQueueCounts(): Promise<Record<string, number>> {
+export const getQueueCounts = cache(async (): Promise<Record<string, number>> => {
   const supabase = await createClient();
   const nowIso = new Date().toISOString();
 
@@ -42,4 +43,4 @@ export async function getQueueCounts(): Promise<Record<string, number>> {
     destruction: destruction.count ?? 0,
     periodic: periodic.count ?? 0,
   };
-}
+});

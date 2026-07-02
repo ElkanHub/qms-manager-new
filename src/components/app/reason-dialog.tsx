@@ -103,7 +103,7 @@ export function ReasonDialog({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={4}
-              required
+              required={minLength > 0}
               minLength={minLength}
             />
             <p className="text-xs text-muted-foreground">

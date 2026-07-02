@@ -11,12 +11,40 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { routeGroup, routeLabels } from "@/components/app/nav";
+import type { CommandDoc } from "@/components/app/command-menu";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// /documents has no index page — its crumb reads and links as the SOP Library.
+const segmentAlias: Record<string, { label: string; href: string }> = {
+  "/documents": { label: "SOP Library", href: "/library" },
+};
+
+// Static sub-pages of a document detail route (depth > 2 only, so the top-level
+// /changes list keeps its own label).
+const tailLabels: Record<string, string> = {
+  history: "Version history",
+  changes: "Changes",
+  draft: "Draft",
+  retire: "Retirement request",
+};
+
+// Group prefix for dynamic detail routes (routeGroup covers exact static paths).
+const prefixGroup: Record<string, string> = {
+  documents: "Work",
+  changes: "Work",
+};
 
 // Breadcrumbs from the shared route manifest (UI_BUILD_PLAN §5). Static segments
-// resolve via routeLabels; a non-linking group crumb (Work/Queues/…) is prefixed
-// per routeGroup. Dynamic segments ([id]) resolve to human labels passed in as
-// `labels` (path → label) by the page/layout.
-export function Breadcrumbs({ labels }: { labels?: Record<string, string> }) {
+// resolve via routeLabels; document ids resolve to "NUMBER · Title" from the same
+// RLS-scoped list the command menu uses; change-control ids render as CC-{short}.
+export function Breadcrumbs({
+  labels,
+  documents,
+}: {
+  labels?: Record<string, string>;
+  documents?: CommandDoc[];
+}) {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
 
@@ -24,11 +52,30 @@ export function Breadcrumbs({ labels }: { labels?: Record<string, string> }) {
   const crumbs = segments.map((_, i) => "/" + segments.slice(0, i + 1).join("/"));
   if (crumbs.length === 0) return null;
 
-  const groupCrumb = routeGroup[pathname];
+  const groupCrumb =
+    routeGroup[pathname] ?? (crumbs.length > 1 ? prefixGroup[segments[0]] : undefined);
 
   const items = crumbs.map((path, i) => {
-    const label = labels?.[path] ?? routeLabels[path] ?? decodeURIComponent(segments[i]);
-    return { path, label, last: i === crumbs.length - 1 };
+    const seg = segments[i];
+    const alias = segmentAlias[path];
+    let label = labels?.[path] ?? routeLabels[path] ?? alias?.label;
+    if (!label && UUID_RE.test(seg)) {
+      if (segments[0] === "documents") {
+        const doc = documents?.find((d) => d.id.toLowerCase() === seg.toLowerCase());
+        label = doc ? `${doc.number} · ${doc.title}` : seg.slice(0, 8);
+      } else if (segments[0] === "changes") {
+        label = `CC-${seg.slice(0, 8)}`;
+      } else {
+        label = seg.slice(0, 8);
+      }
+    }
+    if (!label && i >= 2 && tailLabels[seg]) label = tailLabels[seg];
+    return {
+      path,
+      href: alias?.href ?? path,
+      label: label ?? decodeURIComponent(seg),
+      last: i === crumbs.length - 1,
+    };
   });
 
   return (
@@ -49,7 +96,7 @@ export function Breadcrumbs({ labels }: { labels?: Record<string, string> }) {
                 <BreadcrumbPage className="max-w-[40ch] truncate">{it.label}</BreadcrumbPage>
               ) : (
                 <BreadcrumbLink asChild>
-                  <Link href={it.path}>{it.label}</Link>
+                  <Link href={it.href}>{it.label}</Link>
                 </BreadcrumbLink>
               )}
             </BreadcrumbItem>

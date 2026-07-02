@@ -33,6 +33,7 @@ export function ConfirmDestructiveDialog({
   action,
   submitLabel = "Destroy permanently",
   hiddenFields,
+  extraFields,
 }: {
   trigger: React.ReactNode;
   title?: string;
@@ -43,6 +44,8 @@ export function ConfirmDestructiveDialog({
   action: Action;
   submitLabel?: string;
   hiddenFields?: Record<string, string>;
+  /** Extra visible inputs (e.g. destruction method), submitted under their name. */
+  extraFields?: { name: string; label: string; placeholder?: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -91,6 +94,13 @@ export function ConfirmDestructiveDialog({
             Object.entries(hiddenFields).map(([k, v]) => (
               <input key={k} type="hidden" name={k} value={v} />
             ))}
+
+          {extraFields?.map((f) => (
+            <div key={f.name} className="space-y-2">
+              <Label htmlFor={`extra-${f.name}`}>{f.label}</Label>
+              <Input id={`extra-${f.name}`} name={f.name} placeholder={f.placeholder} />
+            </div>
+          ))}
 
           <div className="space-y-2">
             <Label htmlFor="confirm-type">

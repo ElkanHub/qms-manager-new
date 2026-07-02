@@ -76,6 +76,8 @@ export const columns: ColumnDef<PeriodicRow>[] = [
         description="Record the outcome of this periodic review."
         action={concludeReview}
         submitLabel="Conclude"
+        reasonLabel="Reason / notes (optional)"
+        minLength={0}
         hiddenFields={{ document_id: row.original.id }}
       >
         <OutcomeField />

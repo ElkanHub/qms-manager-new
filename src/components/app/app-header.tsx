@@ -27,7 +27,7 @@ export function AppHeader({
     <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-6" />
-      <Breadcrumbs labels={breadcrumbLabels} />
+      <Breadcrumbs labels={breadcrumbLabels} documents={documents} />
       {plane === "platform" && (
         <Badge variant="outline" className="ml-2">
           Platform plane

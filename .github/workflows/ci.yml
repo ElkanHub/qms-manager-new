@@ -1,8 +1,15 @@
 name: CI
 
+# The pre-deployment gate. Everything that must be true before this app ships:
+#   1. The migration chain applies cleanly from zero (supabase db reset).
+#   2. The SQL substrate suite passes — the real tests: guards, SoD, RLS
+#      isolation, audit immutability, the pipes (supabase/tests/*.sql).
+#   3. The app typechecks AND builds (build catches prerender/env failures
+#      that typecheck cannot).
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
 
 jobs:
   build-and-test:
@@ -19,22 +26,28 @@ jobs:
 
       # Faithful DB: the Supabase local stack has the real anon/authenticated/
       # service_role roles + extensions schema that our migrations depend on.
-      - name: Start Supabase (applies migrations + seed)
+      - name: Start Supabase
         run: npx supabase start
 
-      - name: Verify migrations reset cleanly
-        run: npx supabase db reset --no-seed=false
+      - name: Verify the migration chain applies cleanly from zero
+        run: npx supabase db reset
 
-      - name: SQL substrate tests
+      - name: SQL substrate tests (the suite)
         env:
           SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-        run: node scripts/run-sql-tests.mjs
+        run: npm test
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: App tests
-        run: npm test
+      # Build with placeholder env: catches prerender/route errors before deploy.
+      # Real values are injected by the deployment platform, never by CI.
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key
+        run: npm run build
 
       - name: Stop Supabase
         if: always()
