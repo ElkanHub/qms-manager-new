@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+// Self-hosted Inter (variable) — no build-time Google Fonts fetch, so builds never
+// fail on a flaky network. The font file lives in the repo under ./fonts.
+const inter = localFont({
+  src: "./fonts/inter-variable.woff2",
+  variable: "--font-sans",
+  weight: "100 900",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "QMS Manager",
