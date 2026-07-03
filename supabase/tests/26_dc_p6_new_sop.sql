@@ -29,7 +29,7 @@ create or replace function pg_temp.mkdoc(p_owner uuid, p_title text) returns uui
 declare v uuid;
 begin
   select document_id into v from app.create_document((select tenant_id from t),(select org_id from t),
-    (select qa_department_id from t), p_title, null, p_owner, p_owner, 'ref', 'because');
+    (select qa_department_id from t), p_title, null, p_owner, p_owner, 'ref.docx', 'because');
   return v;
 end $$;
 

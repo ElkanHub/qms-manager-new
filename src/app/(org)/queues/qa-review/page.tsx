@@ -28,6 +28,7 @@ export default async function QaReviewQueue() {
     const d = docOf(r.document_id);
     return {
       id: r.id,
+      documentId: r.document_id,
       number: d?.document_number ?? "—",
       title: d?.title ?? r.document_id,
       submittedBy: r.submitted_by,

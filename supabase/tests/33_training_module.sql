@@ -53,7 +53,7 @@ do $$ declare d uuid; req uuid; qareq uuid; outcome text;
 begin
   select document_id into d from app.create_document((select tenant_id from t),(select org_id from t),
     (select qa_department_id from t),'Aseptic Filling SOP','SOP-77',
-    '77770000-0000-0000-0000-000000000001','77770000-0000-0000-0000-000000000001','ref','initial issue');
+    '77770000-0000-0000-0000-000000000001','77770000-0000-0000-0000-000000000001','ref.docx','initial issue');
   perform pg_temp.as_user('77770000-0000-0000-0000-000000000001');
   req := public.submit_document(d);
   perform pg_temp.as_user('77770000-0000-0000-0000-000000000002');

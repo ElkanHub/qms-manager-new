@@ -192,7 +192,7 @@ export function IntakeFlow({ effectiveDocs }: { effectiveDocs: Doc[] }) {
             <div className="space-y-2">
               <Label htmlFor="content_ref">Content reference</Label>
               <Input id="content_ref" name="content_ref"
-                placeholder="Content reference / upload URL (optional)" />
+                placeholder="Word file URL — .docx / .doc (optional)" />
             </div>
             <Button type="submit" disabled={busy} className="self-start">Continue</Button>
             {error && <p className="text-sm text-destructive">{error}</p>}
