@@ -42,6 +42,8 @@ export type NavItem = {
   icon: LucideIcon;
   roles?: string[];
   badge?: string; // key into the shared queue-counts helper
+  /** Switchboard module this surface belongs to; off → greyed with an upgrade nudge. */
+  moduleKey?: string;
 };
 
 export type NavGroup = {
@@ -57,11 +59,11 @@ export const orgNav: NavGroup[] = [
     label: "Work",
     items: [
       { label: "Start a request", href: "/intake", icon: Inbox },
-      { label: "SOP Library", href: "/library", icon: Library },
+      { label: "SOP Library", href: "/library", icon: Library, moduleKey: "library" },
       { label: "Change controls", href: "/changes", icon: GitPullRequestArrow },
-      { label: "My training", href: "/training", icon: GraduationCap },
-      { label: "Training packages", href: "/training/packages", icon: Sparkles, roles: ["qa", "trainer"] },
-      { label: "Training dashboard", href: "/training/dashboard", icon: BarChart3, roles: ["qa", "trainer"] },
+      { label: "My training", href: "/training", icon: GraduationCap, moduleKey: "training" },
+      { label: "Training packages", href: "/training/packages", icon: Sparkles, roles: ["qa", "trainer"], moduleKey: "training" },
+      { label: "Training dashboard", href: "/training/dashboard", icon: BarChart3, roles: ["qa", "trainer"], moduleKey: "training" },
     ],
   },
   {
@@ -71,8 +73,8 @@ export const orgNav: NavGroup[] = [
       { label: "QA review", href: "/queues/qa-review", icon: ClipboardCheck, roles: ["qa"], badge: "qaReview" },
       { label: "Retirements", href: "/queues/retirements", icon: Archive, roles: ["qa"], badge: "retirements" },
       { label: "Destruction", href: "/queues/destruction", icon: Flame, roles: ["qa"], badge: "destruction" },
-      { label: "Periodic review", href: "/periodic", icon: CalendarClock, roles: ["qa"], badge: "periodic" },
-      { label: "Copies", href: "/copies", icon: Copy },
+      { label: "Periodic review", href: "/periodic", icon: CalendarClock, roles: ["qa"], badge: "periodic", moduleKey: "periodic_review" },
+      { label: "Copies", href: "/copies", icon: Copy, moduleKey: "controlled_copies" },
     ],
   },
   {
@@ -80,7 +82,7 @@ export const orgNav: NavGroup[] = [
     items: [
       { label: "Audit trail", href: "/audit", icon: ScrollText },
       { label: "Classification matrix", href: "/org/classify", icon: Grid3x3, roles: ["qa"] },
-      { label: "Numbering", href: "/org/numbering", icon: Hash, roles: ["qa"] },
+      { label: "Numbering", href: "/org/numbering", icon: Hash, roles: ["qa"], moduleKey: "numbering" },
       { label: "Retention & modules", href: "/org/modules", icon: SlidersHorizontal, roles: ["qa", "org_admin"] },
     ],
   },

@@ -14,12 +14,14 @@ export function AppHeader({
   name,
   email,
   breadcrumbLabels,
+  moduleStates,
 }: {
   plane: "org" | "platform";
   roles: string[];
   name: string | null;
   email: string;
   breadcrumbLabels?: Record<string, string>;
+  moduleStates?: Record<string, boolean>;
 }) {
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
@@ -32,7 +34,7 @@ export function AppHeader({
         </Badge>
       )}
       <div className="ml-auto flex items-center gap-2">
-        <CommandMenu plane={plane} roles={roles} />
+        <CommandMenu plane={plane} roles={roles} moduleStates={moduleStates} />
         <ModeToggle />
         <UserMenu name={name} email={email} />
       </div>

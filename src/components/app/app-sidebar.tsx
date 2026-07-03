@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { toast } from "sonner";
+import { Lock } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -33,17 +35,28 @@ export function AppSidebar({
   orgName,
   roles,
   counts = {},
+  moduleStates = {},
 }: {
   plane: "org" | "platform";
   orgName: string;
   roles: string[];
   counts?: Record<string, number>;
+  /** Switchboard state per module key; a module-linked item greys out when off. */
+  moduleStates?: Record<string, boolean>;
 }) {
   const pathname = usePathname();
   const groups: NavGroup[] = plane === "platform" ? platformNav : orgNav;
   const canSee = (item: NavItem) => !item.roles || item.roles.some((r) => roles.includes(r));
   const isActive = (href: string) =>
     href === pathname || (href !== "/" && pathname.startsWith(href + "/"));
+  // Off = greyed, not hidden: the tenant sees what the platform offers and gets
+  // nudged toward it — display only; the server guards regardless.
+  const moduleOff = (item: NavItem) =>
+    plane === "org" && !!item.moduleKey && moduleStates[item.moduleKey] !== true;
+  const nudge = (label: string) =>
+    toast(`${label} isn't part of your organization's plan yet`, {
+      description: "Ask your platform administrator about enabling it for your organization.",
+    });
 
   return (
     // Platform plane is deliberately distinct (§4.4): the `dark` class flips the
@@ -69,6 +82,21 @@ export function AppSidebar({
               <SidebarMenu>
                 {items.map((item) => {
                   const count = item.badge ? counts[item.badge] : undefined;
+                  if (moduleOff(item)) {
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          tooltip={`${item.label} — not in your plan`}
+                          className="opacity-50"
+                          onClick={() => nudge(item.label)}
+                        >
+                          <item.icon />
+                          <span>{item.label}</span>
+                          <Lock className="ml-auto size-3" />
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  }
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.label}>

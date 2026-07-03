@@ -21,21 +21,22 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
 
   // Documents are no longer preloaded here — the ⌘K palette searches
   // server-side and breadcrumbs resolve labels with a single cached lookup.
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("name")
-    .eq("tenant_id", user.tenant_id)
-    .maybeSingle();
+  const [{ data: org }, { data: mods }] = await Promise.all([
+    supabase.from("organizations").select("name").eq("tenant_id", user.tenant_id).maybeSingle(),
+    supabase.from("tenant_modules").select("module_key, enabled"),
+  ]);
+  const moduleStates = Object.fromEntries((mods ?? []).map((m) => [m.module_key, m.enabled]));
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
-      <AppSidebar plane="org" orgName={org?.name ?? "QMS Manager"} roles={roles} counts={counts} />
+      <AppSidebar plane="org" orgName={org?.name ?? "QMS Manager"} roles={roles} counts={counts} moduleStates={moduleStates} />
       <SidebarInset>
         <AppHeader
           plane="org"
           roles={roles}
           name={user.full_name}
           email={user.email}
+          moduleStates={moduleStates}
         />
         {/* Pages currently supply their own <main>; a div keeps a single landmark
             until pages are rebuilt onto PageHeader (§7). */}
