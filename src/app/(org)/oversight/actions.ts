@@ -31,6 +31,7 @@ export async function issueCopy(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("issue_controlled_copy", {
     p_version: String(formData.get("version_id")),
     p_holder: String(formData.get("holder")),
+    p_purpose: String(formData.get("purpose") || "") || null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/copies");
@@ -42,6 +43,7 @@ export async function reconcileCopy(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("reconcile_copy", {
     p_copy: String(formData.get("copy_id")),
     p_method: String(formData.get("method") || "returned"),
+    p_note: String(formData.get("note") || "") || null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/copies");
