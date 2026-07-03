@@ -13,14 +13,16 @@ export default async function MasterIndex() {
   await requireOrgUser();
   const supabase = await createClient();
 
-  const [{ data: docs }, { data: departments }] = await Promise.all([
+  const [{ data: docs }, { data: departments }, { data: locks }] = await Promise.all([
     supabase
       .from("documents")
       .select("id, document_number, title, department_id")
       .eq("status", "active")
       .order("document_number"),
     supabase.from("departments").select("id, name").order("name"),
+    supabase.from("document_locks").select("document_id"),
   ]);
+  const lockSet = new Set((locks ?? []).map((l) => l.document_id));
 
   const nameOf = (id: string | null) => departments?.find((d) => d.id === id)?.name ?? "—";
   const rows: MasterRow[] = (docs ?? []).map((d) => ({
@@ -29,13 +31,14 @@ export default async function MasterIndex() {
     title: d.title,
     department: nameOf(d.department_id),
     status: "active",
+    isLocked: lockSet.has(d.id),
   }));
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-2">
       <PageHeader
         title="Master Index"
-        description="Every effective document in the organization — cross-department read is by design."
+        description="Every effective document in the organization — cross-department read is by design. Restricted entries still show here; opening one starts an access request."
       />
       <DataTable
         columns={columns}

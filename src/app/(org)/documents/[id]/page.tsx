@@ -16,7 +16,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { GraduationCap, MoreHorizontal } from "lucide-react";
+import { GraduationCap, Hourglass, Lock, MoreHorizontal, Timer } from "lucide-react";
+import { ActionForm } from "@/app/_components/ActionForm";
+import { SectionCard } from "@/components/app/section-card";
+import { ReasonDialog } from "@/components/app/reason-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { resolveContentUrl } from "@/lib/content-ref";
+import { requestReadAccess, lockDocument, unlockDocument } from "@/app/(org)/library/actions";
 import { Viewer } from "./Viewer";
 
 // D-READ — the core document read view. Opens the CURRENT EFFECTIVE version,
@@ -24,10 +31,60 @@ import { Viewer } from "./Viewer";
 // (this is the core read surface, never off). Serves only effective versions.
 export default async function DocumentRead({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireUser();
+  const me = await requireUser();
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("read_document", { p_document: id });
+  const [{ data, error }, { data: lock }, { data: myRequests }] = await Promise.all([
+    supabase.rpc("read_document", { p_document: id }),
+    supabase.from("document_locks").select("document_id, reason").eq("document_id", id).maybeSingle(),
+    supabase
+      .from("read_access_requests")
+      .select("id, state, expires_at, decline_reason")
+      .eq("document_id", id)
+      .eq("requester_id", me.id)
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
   const doc = data?.[0];
+  const myReq = myRequests?.[0] ?? null;
+
+  // Locked and not readable by me: read_document logged the denied attempt and
+  // returned no rows — the request-access surface takes over (L-READ-REQUEST).
+  if (!error && !doc && lock) {
+    const { data: docMeta } = await supabase
+      .from("documents").select("document_number, title").eq("id", id).maybeSingle();
+    return (
+      <div className="mx-auto max-w-lg space-y-6 p-2">
+        <PageHeader
+          overline={docMeta?.document_number ?? "—"}
+          title={docMeta?.title ?? "Restricted document"}
+          description="QA has restricted this document. You can request time-limited read access."
+        />
+        {myReq?.state === "requested" ? (
+          <Alert>
+            <Hourglass className="size-4" />
+            <AlertTitle>Your request is with QA</AlertTitle>
+            <AlertDescription>You will be able to open the document once QA grants access.</AlertDescription>
+          </Alert>
+        ) : (
+          <SectionCard
+            title="Request access"
+            description={myReq?.state === "declined"
+              ? `Your previous request was declined${myReq.decline_reason ? `: ${myReq.decline_reason}` : ""}. You may request again with a clearer purpose.`
+              : "Tell QA why you need to read this document. Grants carry a time limit and every step is on the audit trail."}
+          >
+            <ActionForm action={requestReadAccess} submitLabel="Send request to QA">
+              <input type="hidden" name="document_id" value={id} />
+              <div className="space-y-1.5">
+                <Label htmlFor="purpose">Purpose</Label>
+                <Textarea id="purpose" name="purpose" required rows={3}
+                  placeholder="Why you need to read this document" />
+              </div>
+            </ActionForm>
+          </SectionCard>
+        )}
+      </div>
+    );
+  }
 
   if (error || !doc) {
     return (
@@ -44,6 +101,12 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
       </div>
     );
   }
+
+  const viewerUrl = await resolveContentUrl(doc.rendition_ref);
+  const myGrantUntil =
+    lock && myReq?.state === "granted" && myReq.expires_at && new Date(myReq.expires_at) > new Date()
+      ? new Date(myReq.expires_at)
+      : null;
 
   // Training seam, display side: reading stays open; performing is what's
   // blocked (the transactional guard is app.enforce_trained_for_execution).
@@ -66,6 +129,27 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
         meta={meta}
         actions={
           <>
+            <RoleGate anyOf={["qa"]}>
+              {lock ? (
+                <ActionForm action={unlockDocument} submitLabel="Unlock">
+                  <input type="hidden" name="document_id" value={id} />
+                </ActionForm>
+              ) : (
+                <ReasonDialog
+                  trigger={
+                    <Button variant="outline">
+                      <Lock />
+                      Restrict
+                    </Button>
+                  }
+                  title="Restrict this document"
+                  description="Only QA, the owning department, and users with a time-limited grant will be able to read it. Every read and every denied attempt is logged."
+                  action={lockDocument}
+                  submitLabel="Restrict"
+                  hiddenFields={{ document_id: id }}
+                />
+              )}
+            </RoleGate>
             <Button asChild>
               <Link href={`/intake?target=${id}`}>Request a change</Link>
             </Button>
@@ -96,6 +180,27 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
           </>
         }
       />
+
+      {myGrantUntil && (
+        <Alert>
+          <Timer className="size-4" />
+          <AlertTitle>Temporary access</AlertTitle>
+          <AlertDescription>
+            QA granted you read access until {myGrantUntil.toLocaleString()} — after that this
+            document locks again for you.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {lock && (
+        <Alert>
+          <Lock className="size-4" />
+          <AlertDescription>
+            This document is restricted by QA{lock.reason ? ` — ${lock.reason}` : ""}. Reads are
+            individually logged.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {trainingBlocked && (
         <Alert variant="destructive">
@@ -131,7 +236,7 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
               <Badge variant="outline">Read-only rendition</Badge>
             </div>
             <div className="bg-white p-2">
-              <Viewer renderer={doc.renderer} renditionRef={doc.rendition_ref} />
+              <Viewer renderer={doc.renderer} renditionRef={viewerUrl} />
             </div>
           </Card>
         </TabsContent>

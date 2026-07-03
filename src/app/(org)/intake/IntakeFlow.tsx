@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { StateTimeline, type TimelineStage } from "@/components/app/state-timeline";
+import { SopUpload } from "@/components/app/sop-upload";
 
 type Doc = { id: string; label: string };
 const RATIONALE: Record<string, string> = {
@@ -190,9 +191,8 @@ export function IntakeFlow({ effectiveDocs }: { effectiveDocs: Doc[] }) {
               <Label htmlFor="discontinue">Discontinue the target (retirement)</Label>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="content_ref">Content reference</Label>
-              <Input id="content_ref" name="content_ref"
-                placeholder="Word file URL — .docx / .doc (optional)" />
+              <Label>Document content (optional now, required before submission)</Label>
+              <SopUpload name="content_ref" />
             </div>
             <Button type="submit" disabled={busy} className="self-start">Continue</Button>
             {error && <p className="text-sm text-destructive">{error}</p>}

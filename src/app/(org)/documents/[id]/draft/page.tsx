@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { MessageSquareText } from "lucide-react";
+import { SopUpload } from "@/components/app/sop-upload";
 import { updateDraft, submitDocument } from "../../actions";
 
 // D-DRAFT — the author's draft editor. Edit title/content/reason, then submit into
@@ -108,13 +109,8 @@ export default async function DraftEditor({ params }: { params: Promise<{ id: st
                 <Input id="title" name="title" defaultValue={doc.title ?? ""} placeholder="Title" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="content_ref">Content file (Word)</Label>
-                <Input
-                  id="content_ref"
-                  name="content_ref"
-                  defaultValue={version?.content_ref ?? ""}
-                  placeholder="Word file URL (.docx / .doc)"
-                />
+                <Label>Content file (Word)</Label>
+                <SopUpload name="content_ref" defaultValue={version?.content_ref ?? ""} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="reason">Reason for change</Label>
