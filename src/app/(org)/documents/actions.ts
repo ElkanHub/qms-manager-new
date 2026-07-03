@@ -85,3 +85,38 @@ export async function qaApprove(formData: FormData): Promise<Result> {
   revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Approved." };
 }
+
+// Commit an anchored review comment (D-REVIEW-ANNOTATE). Returns the stored
+// comment so the annotation view can pin it without a reload.
+export async function addReviewComment(input: {
+  versionId: string;
+  quote: string;
+  prefix: string;
+  suffix: string;
+  comment: string;
+}): Promise<
+  | { ok: true; comment: { id: string; quote: string; prefix: string | null; comment: string; author: string; at: string } }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("add_review_comment", {
+    p_version: input.versionId,
+    p_quote: input.quote,
+    p_comment: input.comment,
+    p_prefix: input.prefix || null,
+    p_suffix: input.suffix || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  const { data: me } = await supabase.auth.getUser();
+  return {
+    ok: true,
+    comment: {
+      id: String(data),
+      quote: input.quote,
+      prefix: input.prefix || null,
+      comment: input.comment,
+      author: me.user?.email ?? "me",
+      at: new Date().toLocaleString(),
+    },
+  };
+}

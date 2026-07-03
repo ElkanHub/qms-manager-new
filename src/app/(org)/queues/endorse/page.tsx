@@ -50,6 +50,7 @@ export default async function EndorseQueue() {
     const v = versionOf(r.version_id);
     return {
       id: r.id,
+      documentId: r.document_id,
       number: d?.document_number ?? "—",
       title: d?.title ?? r.document_id,
       author: authorOf(r.submitted_by),

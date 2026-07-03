@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Link from "next/link";
+import { MessageSquareText } from "lucide-react";
 import { updateDraft, submitDocument } from "../../actions";
 
 // D-DRAFT — the author's draft editor. Edit title/content/reason, then submit into
@@ -24,7 +26,7 @@ export default async function DraftEditor({ params }: { params: Promise<{ id: st
     .maybeSingle();
   const { data: version } = await supabase
     .from("document_versions")
-    .select("content_ref, reason_for_change")
+    .select("id, content_ref, reason_for_change")
     .eq("document_id", id)
     .eq("status", "draft")
     .order("created_at", { ascending: false })
@@ -40,6 +42,16 @@ export default async function DraftEditor({ params }: { params: Promise<{ id: st
   }
 
   const editable = doc.status === "draft" || doc.status === "in_review";
+
+  // Review comments pinned to this draft (the annotation round-trip): the
+  // author reads them on the review screen, corrects the SOP in Word, and
+  // re-uploads — content never changes inside the app.
+  const { count: commentCount } = version?.id
+    ? await supabase
+        .from("review_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("document_version_id", version.id)
+    : { count: 0 };
 
   // Display-only routing reflection (server RPC still decides): managers (HOD/QA/admin)
   // submit straight to QA; everyone else goes to HOD endorsement first.
@@ -66,6 +78,20 @@ export default async function DraftEditor({ params }: { params: Promise<{ id: st
         status={doc.status}
       />
 
+      {(commentCount ?? 0) > 0 && (
+        <Alert>
+          <MessageSquareText className="size-4" />
+          <AlertDescription>
+            The reviewer left {commentCount} anchored {commentCount === 1 ? "comment" : "comments"}{" "}
+            on this draft —{" "}
+            <Link href={`/documents/${id}/review`} className="font-medium underline underline-offset-4">
+              see each one pinned to its passage
+            </Link>
+            . Correct the SOP in Word and re-upload the corrected file below.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {!editable ? (
         <Alert>
           <AlertDescription>
@@ -82,12 +108,12 @@ export default async function DraftEditor({ params }: { params: Promise<{ id: st
                 <Input id="title" name="title" defaultValue={doc.title ?? ""} placeholder="Title" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="content_ref">Content reference</Label>
+                <Label htmlFor="content_ref">Content file (Word)</Label>
                 <Input
                   id="content_ref"
                   name="content_ref"
                   defaultValue={version?.content_ref ?? ""}
-                  placeholder="Content reference / upload URL"
+                  placeholder="Word file URL (.docx / .doc)"
                 />
               </div>
               <div className="grid gap-2">

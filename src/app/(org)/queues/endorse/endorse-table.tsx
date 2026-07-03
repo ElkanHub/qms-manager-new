@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import type { ColumnDef } from "@tanstack/react-table";
 import { Stamp } from "lucide-react";
 import { DataTable } from "@/components/app/data-table";
@@ -20,6 +22,7 @@ import { endorse, requestChanges } from "@/app/(org)/documents/actions";
 
 export type EndorseRow = {
   id: string;
+  documentId: string;
   number: string;
   title: string;
   author: string;
@@ -97,6 +100,9 @@ function EndorseSheet({ r }: { r: EndorseRow }) {
 
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">Other decisions</h3>
+            <Button variant="outline" asChild className="mr-2">
+              <Link href={`/documents/${r.documentId}/review`}>Annotate the draft</Link>
+            </Button>
             <ReasonDialog
               action={requestChanges}
               title="Request changes"

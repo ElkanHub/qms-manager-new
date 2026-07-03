@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import type { ColumnDef } from "@tanstack/react-table";
 import { ClipboardCheck } from "lucide-react";
 import { DataTable } from "@/components/app/data-table";
@@ -25,6 +27,7 @@ import { qaApprove, requestChanges, rejectRequest } from "@/app/(org)/documents/
 
 export type QaReviewRow = {
   id: string;
+  documentId: string;
   number: string;
   title: string;
   submittedBy: string;
@@ -137,7 +140,10 @@ const columns: ColumnDef<QaReviewRow>[] = [
     id: "actions",
     header: "",
     cell: ({ row }) => (
-      <div className="text-right">
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/documents/${row.original.documentId}/review`}>Annotate</Link>
+        </Button>
         <ReviewSheet r={row.original} />
       </div>
     ),
