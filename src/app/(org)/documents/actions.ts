@@ -25,6 +25,7 @@ export async function submitDocument(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("submit_document", { p_document: String(formData.get("document_id")) });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/documents/${formData.get("document_id")}/draft`);
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Submitted for review." };
 }
 
@@ -33,6 +34,7 @@ export async function resubmitDocument(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("resubmit_document", { p_document: String(formData.get("document_id")) });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/documents/${formData.get("document_id")}/changes`);
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Resubmitted." };
 }
 
@@ -45,6 +47,7 @@ export async function requestChanges(formData: FormData): Promise<Result> {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/endorse");
   revalidatePath("/queues/qa-review");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Changes requested." };
 }
 
@@ -53,6 +56,7 @@ export async function endorse(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("endorse_request", { p_request: String(formData.get("request_id")) });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/endorse");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Endorsed." };
 }
 
@@ -64,6 +68,7 @@ export async function rejectRequest(formData: FormData): Promise<Result> {
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/qa-review");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Rejected." };
 }
 
@@ -77,5 +82,6 @@ export async function qaApprove(formData: FormData): Promise<Result> {
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/qa-review");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Approved." };
 }

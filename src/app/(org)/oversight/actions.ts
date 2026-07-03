@@ -60,6 +60,7 @@ export async function concludeReview(formData: FormData): Promise<Result> {
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/periodic");
+  revalidatePath("/", "layout"); // sidebar badges
   return {
     ok: true,
     message: outcome === "revise" ? `Change control raised (${data}).` : "Next review rescheduled.",

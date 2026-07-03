@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,7 +12,11 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { routeGroup, routeLabels } from "@/components/app/nav";
-import type { CommandDoc } from "@/components/app/command-menu";
+import { getDocumentLabel } from "@/lib/document-search";
+
+// Session-lived cache: each document id is looked up once, however many times
+// its crumbs render.
+const docLabelCache = new Map<string, string>();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,17 +41,35 @@ const prefixGroup: Record<string, string> = {
 };
 
 // Breadcrumbs from the shared route manifest (UI_BUILD_PLAN §5). Static segments
-// resolve via routeLabels; document ids resolve to "NUMBER · Title" from the same
-// RLS-scoped list the command menu uses; change-control ids render as CC-{short}.
-export function Breadcrumbs({
-  labels,
-  documents,
-}: {
-  labels?: Record<string, string>;
-  documents?: CommandDoc[];
-}) {
+// resolve via routeLabels; document ids resolve to "NUMBER · Title" via one
+// RLS-scoped lookup (cached); change-control ids render as CC-{short}.
+export function Breadcrumbs({ labels }: { labels?: Record<string, string> }) {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
+
+  const docId =
+    segments[0] === "documents" && segments[1] && UUID_RE.test(segments[1])
+      ? segments[1].toLowerCase()
+      : null;
+  const [docLabel, setDocLabel] = React.useState<string | null>(
+    docId ? (docLabelCache.get(docId) ?? null) : null,
+  );
+  React.useEffect(() => {
+    if (!docId) return;
+    const cached = docLabelCache.get(docId);
+    if (cached) {
+      setDocLabel(cached);
+      return;
+    }
+    let live = true;
+    getDocumentLabel(docId).then((label) => {
+      if (label) docLabelCache.set(docId, label);
+      if (live && label) setDocLabel(label);
+    });
+    return () => {
+      live = false;
+    };
+  }, [docId]);
 
   // Build cumulative paths, e.g. /documents, /documents/123.
   const crumbs = segments.map((_, i) => "/" + segments.slice(0, i + 1).join("/"));
@@ -61,8 +84,7 @@ export function Breadcrumbs({
     let label = labels?.[path] ?? routeLabels[path] ?? alias?.label;
     if (!label && UUID_RE.test(seg)) {
       if (segments[0] === "documents") {
-        const doc = documents?.find((d) => d.id.toLowerCase() === seg.toLowerCase());
-        label = doc ? `${doc.number} · ${doc.title}` : seg.slice(0, 8);
+        label = docLabel ?? seg.slice(0, 8);
       } else if (segments[0] === "changes") {
         label = `CC-${seg.slice(0, 8)}`;
       } else {

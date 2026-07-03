@@ -13,6 +13,7 @@ export async function requestRetirement(formData: FormData): Promise<Result> {
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/retirements");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true, message: "Retirement requested." };
 }
 
@@ -21,6 +22,7 @@ export async function approveRetirement(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("approve_retirement", { p_retirement: String(formData.get("retirement_id")) });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/retirements");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true };
 }
 
@@ -29,6 +31,7 @@ export async function withdrawRetirement(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("withdraw_retirement", { p_retirement: String(formData.get("retirement_id")) });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/retirements");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true };
 }
 
@@ -41,5 +44,6 @@ export async function destroyVersion(formData: FormData): Promise<Result> {
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/queues/destruction");
+  revalidatePath("/", "layout"); // sidebar badges
   return { ok: true };
 }

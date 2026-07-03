@@ -19,21 +19,13 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
   ]);
   const sidebarOpen = cookieStore.get("sidebar_state")?.value !== "false";
 
-  const [{ data: org }, { data: docs }] = await Promise.all([
-    supabase.from("organizations").select("name").eq("tenant_id", user.tenant_id).maybeSingle(),
-    supabase
-      .from("documents")
-      .select("id, document_number, title")
-      .eq("status", "active")
-      .order("document_number")
-      .limit(500),
-  ]);
-
-  const documents = (docs ?? []).map((d) => ({
-    id: d.id as string,
-    number: d.document_number as string,
-    title: d.title as string,
-  }));
+  // Documents are no longer preloaded here — the ⌘K palette searches
+  // server-side and breadcrumbs resolve labels with a single cached lookup.
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("tenant_id", user.tenant_id)
+    .maybeSingle();
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
@@ -44,7 +36,6 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
           roles={roles}
           name={user.full_name}
           email={user.email}
-          documents={documents}
         />
         {/* Pages currently supply their own <main>; a div keeps a single landmark
             until pages are rebuilt onto PageHeader (§7). */}
