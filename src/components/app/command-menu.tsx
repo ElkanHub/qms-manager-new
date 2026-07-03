@@ -29,9 +29,12 @@ import { searchDocuments, type DocHit } from "@/lib/document-search";
 export function CommandMenu({
   plane,
   roles,
+  moduleStates = {},
 }: {
   plane: "org" | "platform";
   roles: string[];
+  /** Module-off destinations stay out of the palette (the sidebar carries the nudge). */
+  moduleStates?: Record<string, boolean>;
 }) {
   const router = useRouter();
   const { setTheme, theme } = useTheme();
@@ -68,10 +71,12 @@ export function CommandMenu({
 
   const groups = plane === "platform" ? platformNav : orgNav;
   const canSee = (item: NavItem) => !item.roles || item.roles.some((r) => roles.includes(r));
+  const moduleOn = (item: NavItem) =>
+    plane !== "org" || !item.moduleKey || moduleStates[item.moduleKey] === true;
   const navItems = [
     ...groups.flatMap((g) => g.items),
     ...(plane === "org" ? orgFooterNav : []),
-  ].filter(canSee);
+  ].filter((i) => canSee(i) && moduleOn(i));
 
   const go = (href: string) => {
     setOpen(false);
