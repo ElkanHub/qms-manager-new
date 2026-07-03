@@ -13,13 +13,23 @@ export default async function PlatformHome() {
   await requirePlatformUser();
   const { isOwner } = await getPlatformIdentity();
   const admin = createAdminClient();
-  const { data: tenants } = await admin.from("tenants").select("id, name, status, created_at").order("created_at");
+  const [{ data: tenants }, { data: files }, { data: limits }] = await Promise.all([
+    admin.from("tenants").select("id, name, status, created_at").order("created_at"),
+    admin.from("stored_files").select("tenant_id, bytes"),
+    admin.from("tenant_storage_limits").select("tenant_id, max_bytes"),
+  ]);
+  const usedBy = (id: string) =>
+    (files ?? []).filter((f) => f.tenant_id === id).reduce((a, f) => a + Number(f.bytes), 0);
+  const limitOf = (id: string) =>
+    Number(limits?.find((l) => l.tenant_id === id)?.max_bytes ?? 1073741824);
 
   const rows: TenantRow[] = (tenants ?? []).map((t) => ({
     id: t.id,
     name: t.name,
     status: t.status,
     created: new Date(t.created_at).toISOString().slice(0, 10),
+    storageUsedBytes: usedBy(t.id),
+    storageLimitBytes: limitOf(t.id),
   }));
 
   return (

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { EmptyState } from "@/components/app/empty-state";
 import { DataTable } from "@/components/app/data-table";
 import { ModuleOffAlert } from "@/components/app/module-off-alert";
+import { RoleGate } from "@/components/app/role-gate";
 import { Button } from "@/components/ui/button";
 import { columns, type LibraryRow } from "./columns";
 
@@ -39,17 +40,30 @@ export default async function Library({
   if (category) query = query.eq("category", category);
   const { data: docs } = await query;
 
-  const { data: favs } = await supabase.from("document_favorites").select("document_id");
+  const [{ data: favs }, { data: cats }, { data: docCats }, { data: locks }] = await Promise.all([
+    supabase.from("document_favorites").select("document_id"),
+    supabase.from("library_categories").select("id, name").order("sort_order"),
+    supabase.from("document_categories").select("document_id, category_id"),
+    supabase.from("document_locks").select("document_id"),
+  ]);
   const favSet = new Set((favs ?? []).map((f) => f.document_id));
+  const lockSet = new Set((locks ?? []).map((l) => l.document_id));
+  const catName = (cid: string) => cats?.find((c) => c.id === cid)?.name;
+  const categoriesOf = (docId: string) =>
+    (docCats ?? [])
+      .filter((dc) => dc.document_id === docId)
+      .map((dc) => catName(dc.category_id))
+      .filter(Boolean) as string[];
 
   const rows: LibraryRow[] = (docs ?? [])
     .map((d) => ({
       id: d.id,
       number: d.document_number ?? "—",
       title: d.title,
-      category: d.category ?? "—",
+      category: categoriesOf(d.id).join(", ") || (d.category ?? "—"),
       status: "active",
       isFavorite: favSet.has(d.id),
+      isLocked: lockSet.has(d.id),
     }))
     // Favorited documents float to the top.
     .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
@@ -60,9 +74,16 @@ export default async function Library({
         title="SOP Library"
         description="Your department's working view"
         actions={
-          <Button asChild>
-            <Link href="/library/master">Master Index</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <RoleGate anyOf={["qa", "org_admin"]}>
+              <Button variant="outline" asChild>
+                <Link href="/library/config">Library setup</Link>
+              </Button>
+            </RoleGate>
+            <Button asChild>
+              <Link href="/library/master">Master Index</Link>
+            </Button>
+          </div>
         }
       />
       {!libraryOn && (

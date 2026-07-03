@@ -50,7 +50,7 @@ export default async function AuditViewer({
   const data: AuditRow[] = (rows ?? []).map((r) => ({
     id: String(r.id),
     time: r.occurred_at,
-    actor: r.actor_email ?? "—",
+    actor: r.actor_email ?? "System (automatic)",
     action: r.action,
     entityType: r.entity_type ?? "",
     entityId: r.entity_id ? String(r.entity_id) : null,

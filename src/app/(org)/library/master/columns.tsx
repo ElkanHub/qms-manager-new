@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Lock as LockIcon } from "lucide-react";
 import { StatusBadge } from "@/components/app/status-badge";
 
 export type MasterRow = {
+  isLocked?: boolean;
   id: string;
   number: string;
   title: string;
@@ -23,7 +25,10 @@ export const columns: ColumnDef<MasterRow>[] = [
     cell: ({ row }) => (
       <Link href={`/documents/${row.original.id}`} className="flex flex-col" onClick={(e) => e.stopPropagation()}>
         <span className="font-mono text-xs text-muted-foreground">{row.original.number}</span>
-        <span className="font-medium">{row.original.title}</span>
+        <span className="flex items-center gap-1.5 font-medium">
+          {row.original.title}
+          {row.original.isLocked && <LockIcon className="size-3.5 text-muted-foreground" aria-label="Restricted" />}
+        </span>
       </Link>
     ),
   },

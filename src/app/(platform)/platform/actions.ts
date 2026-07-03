@@ -135,3 +135,15 @@ export async function setAiGatewayConfig(formData: FormData): Promise<Result> {
   revalidatePath("/platform/ai-gateway");
   return { ok: true, message: "Gateway configuration saved." };
 }
+
+export async function setStorageLimit(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const gb = Number(formData.get("gb") || 0);
+  const { error } = await supabase.rpc("set_tenant_storage_limit", {
+    p_tenant: String(formData.get("tenant_id")),
+    p_max_bytes: Math.round(gb * 1024 * 1024 * 1024),
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/platform");
+  return { ok: true, message: `Storage limit set to ${gb} GB.` };
+}

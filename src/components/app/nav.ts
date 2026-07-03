@@ -58,7 +58,6 @@ export const orgNav: NavGroup[] = [
     items: [
       { label: "Start a request", href: "/intake", icon: Inbox },
       { label: "SOP Library", href: "/library", icon: Library },
-      { label: "Master Index", href: "/library/master", icon: FileText },
       { label: "Change controls", href: "/changes", icon: GitPullRequestArrow },
       { label: "My training", href: "/training", icon: GraduationCap },
       { label: "Training packages", href: "/training/packages", icon: Sparkles, roles: ["qa", "trainer"] },
@@ -128,6 +127,7 @@ export const routeLabels: Record<string, string> = {
   "/intake": "Start a request",
   "/library": "SOP Library",
   "/library/master": "Master Index",
+  "/library/config": "Library setup",
   "/changes": "Change controls",
   "/queues/endorse": "Endorsements",
   "/queues/qa-review": "QA review",
@@ -168,6 +168,7 @@ export const routeGroup: Record<string, string> = {
   "/intake": "Work",
   "/library": "Work",
   "/library/master": "Work",
+  "/library/config": "Work",
   "/changes": "Work",
   "/training": "Work",
   "/training/packages": "Work",

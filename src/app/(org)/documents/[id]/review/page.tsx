@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireOrgUser, getMyRoles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { extractDocxParagraphs } from "@/lib/extract-docx";
+import { resolveContentUrl } from "@/lib/content-ref";
 import { PageHeader } from "@/components/app/page-header";
 import { ReasonDialog } from "@/components/app/reason-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -50,6 +51,7 @@ export default async function ReviewDocument({ params }: { params: Promise<{ id:
     );
   }
 
+  const contentUrl = await resolveContentUrl(version.content_ref);
   const [{ data: comments }, { data: pendingReq }, { paragraphs, error: extractError }] =
     await Promise.all([
       supabase
@@ -63,7 +65,7 @@ export default async function ReviewDocument({ params }: { params: Promise<{ id:
         .eq("document_id", id)
         .eq("status", "pending")
         .maybeSingle(),
-      extractDocxParagraphs(version.content_ref),
+      extractDocxParagraphs(contentUrl),
     ]);
   const authorIds = [...new Set((comments ?? []).map((c) => c.author_id))];
   const { data: authors } = authorIds.length
@@ -111,7 +113,7 @@ export default async function ReviewDocument({ params }: { params: Promise<{ id:
           <TabsTrigger value="annotate">Annotation view</TabsTrigger>
         </TabsList>
         <TabsContent value="faithful">
-          <Viewer renderer="ms_online" renditionRef={version.content_ref} />
+          <Viewer renderer="ms_online" renditionRef={contentUrl} />
           <p className="mt-1 text-xs text-muted-foreground">
             Formatting-faithful render. To flag a specific passage, switch to the annotation view.
           </p>
