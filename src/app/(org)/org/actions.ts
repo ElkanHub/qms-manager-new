@@ -110,3 +110,24 @@ export async function inviteUser(formData: FormData): Promise<Result> {
   const token = data?.[0]?.token;
   return { ok: true, message: `${env.siteUrl()}/invite/accept?token=${token}` };
 }
+
+export async function setDepartmentCode(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_department_code", {
+    p_department: String(formData.get("department_id")),
+    p_code: String(formData.get("code") || ""),
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/org/departments");
+  return { ok: true, message: "Department code saved." };
+}
+
+export async function setRetentionPeriod(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_retention_period", {
+    p_months: Number(formData.get("months") || 0),
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/org/modules");
+  return { ok: true, message: "Retention period saved." };
+}
