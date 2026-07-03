@@ -24,14 +24,15 @@ select set_config('request.jwt.claims', json_build_object('sub','ffffffff-0000-0
   'app_metadata', json_build_object('platform_role','admin'))::text, true);
 set local role authenticated;
 select public.set_onboarding_flow((select tenant_id from t), $json$
-  [ {"key":"profile","title":"Your profile",
-     "fields":[ {"key":"phone","label":"Phone","type":"text","required":true},
+  [ {"key":"site_info","title":"Site details",
+     "fields":[ {"key":"emergency_contact","label":"Emergency contact","type":"text","required":true},
                 {"key":"note","label":"Note","type":"textarea","required":false} ]} ]
-$json$::jsonb);
+$json$::jsonb, 'org_setup');
 reset role;
 
 select assert((select jsonb_array_length(steps) from onboarding_flows
-               where tenant_id=(select tenant_id from t)) = 1, 'flow saved with one step');
+               where tenant_id=(select tenant_id from t) and audience='org_setup') = 1,
+  'flow saved with one custom step');
 select assert(exists(select 1 from audit_trail where action='onboarding.flow_set'),
   'setting the flow is audited');
 
@@ -42,15 +43,18 @@ set local role authenticated;
 select assert_raises($$select public.set_onboarding_flow((select tenant_id from t),'[]'::jsonb)$$,
   'an org user cannot configure the onboarding flow');
 
--- ---- the user completes onboarding (required field enforced) ----
+-- ---- the user completes onboarding (required field enforced; v2: the first
+-- onboarder runs org setup, needs the locked defaults + their signature) ----
+select public.save_user_signature('data:image/png;base64,' || repeat('iVBORw0KGgoAAAANSUhEUg', 20), 'drawn');
 select assert_raises($$select public.submit_onboarding('{"note":"hi"}'::jsonb)$$,
-  'submitting without the required field is refused');
-select public.submit_onboarding('{"phone":"0800","note":"hi"}'::jsonb);
+  'submitting without the required fields is refused');
+select public.submit_onboarding(
+  '{"full_name":"User A","job_title":"Author","branding_display_name":"Org A","emergency_contact":"0800","note":"hi"}'::jsonb);
 reset role;
 
 select assert((select onboarded_at from users where id='ffffffff-0000-0000-0000-000000000003') is not null,
   'user is marked onboarded after completing');
-select assert((select answers->>'phone' from onboarding_responses
+select assert((select answers->>'emergency_contact' from onboarding_responses
                where user_id='ffffffff-0000-0000-0000-000000000003') = '0800',
   'collected data is stored');
 select assert(exists(select 1 from audit_trail where action='onboarding.completed'),

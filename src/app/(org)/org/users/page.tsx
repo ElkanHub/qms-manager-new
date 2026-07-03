@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { DataTable } from "@/components/app/data-table";
 import { Button } from "@/components/ui/button";
 import { columns, type UserRow } from "./columns";
+import { SpecimenDialog, type SpecimenRow } from "./specimen-dialog";
 
 const QUALITY_CRITICAL = new Set(["qa", "approver", "signatory"]);
 
@@ -17,12 +18,15 @@ export default async function UsersPage() {
   const isQA = (await getMyRoles()).includes("qa");
   const supabase = await createClient();
 
-  const [{ data: users }, { data: roles }, { data: assignments }, { data: departments }] =
+  const [{ data: users }, { data: roles }, { data: assignments }, { data: departments },
+         { data: signatures }, { data: responses }] =
     await Promise.all([
       supabase.from("users").select("*").order("email"),
       supabase.from("roles").select("*").order("label"),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("departments").select("id, name").order("name"),
+      supabase.from("user_signatures").select("user_id, image_data, source"),
+      supabase.from("onboarding_responses").select("user_id, answers"),
     ]);
 
   const grantable = (roles ?? [])
@@ -53,15 +57,31 @@ export default async function UsersPage() {
     };
   });
 
+  // Profile + signatures attach to the person here (collected at onboarding).
+  const specimenRows: SpecimenRow[] = (users ?? []).map((u) => {
+    const sig = signatures?.find((x) => x.user_id === u.id);
+    const answers = (responses?.find((x) => x.user_id === u.id)?.answers ?? {}) as Record<string, string>;
+    return {
+      id: u.id,
+      name: u.full_name ?? u.email,
+      jobTitle: answers.job_title ?? null,
+      signature: sig?.image_data ?? null,
+      source: sig?.source ?? null,
+    };
+  });
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-2">
       <PageHeader
         title="Users & roles"
-        description="Everyone in your organization, the roles they hold, and their access status."
+        description="Everyone in your organization, the roles they hold, their profile details, and their signatures."
         actions={
-          <Button asChild>
-            <Link href="/org/invite">Invite user</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <SpecimenDialog rows={specimenRows} />
+            <Button asChild>
+              <Link href="/org/invite">Invite user</Link>
+            </Button>
+          </div>
         }
       />
       <DataTable
