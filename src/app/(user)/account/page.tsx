@@ -1,4 +1,6 @@
 import { requireUser, getMyRoles } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { SignatureCapture } from "@/components/app/signature-capture";
 import { PageHeader } from "@/components/app/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -11,6 +13,12 @@ import { SignOutButton } from "./SignOutButton";
 export default async function Account() {
   const user = await requireUser();
   const roles = await getMyRoles();
+  const supabase = await createClient();
+  const { data: mySig } = await supabase
+    .from("user_signatures")
+    .select("image_data")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   const name = user.full_name ?? user.email;
   const initials = (user.full_name ?? user.email)
@@ -77,6 +85,22 @@ export default async function Account() {
           </div>
         </CardContent>
       </Card>
+
+      {user.plane === "org" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Signature</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* The signature used when signing documents — replaceable any time;
+                every capture is audited. Initials regenerate from the name. */}
+            <SignatureCapture
+              fullName={user.full_name ?? user.email}
+              initialSignature={mySig?.image_data ?? null}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -9,6 +9,8 @@ import {
 import { PageHeader } from "@/components/app/page-header";
 import { SectionCard } from "@/components/app/section-card";
 import { StateTimeline, type TimelineStage } from "@/components/app/state-timeline";
+import { InitialsSignature } from "@/components/app/initials-signature";
+import { SignaturePicker } from "./signature-picker";
 import { StatusBadge } from "@/components/app/status-badge";
 import { ReasonDialog } from "@/components/app/reason-dialog";
 import { Button } from "@/components/ui/button";
@@ -37,7 +39,6 @@ const STAGE_AT: Record<string, number> = {
 
 export default async function ChangeWorkstation({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireOrgUser();
   const roles = await getMyRoles();
   const isQA = roles.includes("qa");
   const isAdmin = roles.includes("org_admin");
@@ -65,7 +66,27 @@ export default async function ChangeWorkstation({ params }: { params: Promise<{ 
     : { data: [] };
   const docOf = (x: string) => docs?.find((d) => d.id === x);
   const { data: sigs } = await supabase
-    .from("signatures").select("role_key, signatory_id, signed_at, waived, waiver_reason").eq("change_control_id", id);
+    .from("signatures")
+    .select("role_key, signatory_id, signed_at, waived, waiver_reason, signature_kind")
+    .eq("change_control_id", id);
+
+  // The signing surface: the caller's own recorded signature (to choose from)
+  // and every signatory's, so applied signatures render as what was signed.
+  const me = await requireOrgUser();
+  const signatoryIds = [...new Set([me.id, ...(sigs ?? []).map((x) => x.signatory_id).filter(Boolean)])] as string[];
+  const [{ data: sigImages }, { data: signers }] = await Promise.all([
+    signatoryIds.length
+      ? supabase.from("user_signatures").select("user_id, image_data").in("user_id", signatoryIds)
+      : Promise.resolve({ data: [] as { user_id: string; image_data: string }[] }),
+    signatoryIds.length
+      ? supabase.from("users").select("id, full_name, email").in("id", signatoryIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string }[] }),
+  ]);
+  const sigImageOf = (uid: string | null) => sigImages?.find((x) => x.user_id === uid)?.image_data ?? null;
+  const nameOf = (uid: string | null) => {
+    const u = signers?.find((x) => x.id === uid);
+    return u?.full_name ?? u?.email ?? "";
+  };
 
   // The reconciliation worklist: every issued copy of the outgoing versions,
   // with only controlled/display marked blocking (uncontrolled never blocks).
@@ -232,21 +253,33 @@ export default async function ChangeWorkstation({ params }: { params: Promise<{ 
         <SectionCard title="Signatures">
           <ul className="mb-4 divide-y">
             {(sigs ?? []).map((sig) => (
-              <li key={sig.role_key} className="flex items-center justify-between py-2 text-sm">
+              <li key={sig.role_key} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span className="font-medium">{sig.role_key}</span>
-                <span className="text-xs text-muted-foreground">
-                  {sig.signed_at ? "signed" : sig.waived ? `waived (${sig.waiver_reason})` : "pending"}
-                </span>
+                {sig.signed_at ? (
+                  <span className="flex items-center gap-2">
+                    {sig.signature_kind === "initials" ? (
+                      <InitialsSignature fullName={nameOf(sig.signatory_id)} className="h-10 min-w-16 text-base" />
+                    ) : sigImageOf(sig.signatory_id) ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- small data URL
+                      <img
+                        src={sigImageOf(sig.signatory_id)!}
+                        alt={`Signature of ${nameOf(sig.signatory_id)}`}
+                        className="h-10 rounded border bg-white object-contain px-1"
+                      />
+                    ) : null}
+                    <span className="text-xs text-muted-foreground">
+                      {nameOf(sig.signatory_id)} · signed
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {sig.waived ? `waived (${sig.waiver_reason})` : "pending"}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
-          <ActionForm action={applySignature} submitLabel="Sign (my required role)">
-            <Cc id={id} />
-            <div className="space-y-1.5">
-              <Label htmlFor="meaning">Meaning of signature (e.g. reviewed / approved)</Label>
-              <Input id="meaning" name="meaning" required />
-            </div>
-          </ActionForm>
+          <SignaturePicker ccId={id} fullName={me.full_name ?? me.email} mySignature={sigImageOf(me.id)} />
           {isAdmin && (
             <div className="mt-4">
               <ReasonDialog
