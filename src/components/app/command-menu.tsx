@@ -21,24 +21,24 @@ import {
   platformNav,
   type NavItem,
 } from "@/components/app/nav";
+import { searchDocuments, type DocHit } from "@/lib/document-search";
 
-// ⌘K command palette (UI_BUILD_PLAN §4.3). Nav-only + actions for now; document
-// search is a later pass (§10.2). Role filtering is display-only.
-export type CommandDoc = { id: string; number: string; title: string };
-
+// ⌘K command palette (UI_BUILD_PLAN §4.3). Nav + actions are the static
+// manifest (instant); documents come from a debounced server search — RLS-
+// scoped, any library size, nothing preloaded. Role filtering is display-only.
 export function CommandMenu({
   plane,
   roles,
-  documents = [],
 }: {
   plane: "org" | "platform";
   roles: string[];
-  /** Effective documents for the "Documents" search group (§4.3). */
-  documents?: CommandDoc[];
 }) {
   const router = useRouter();
   const { setTheme, theme } = useTheme();
   const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const [hits, setHits] = React.useState<DocHit[]>([]);
+  const searchSeq = React.useRef(0);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -51,6 +51,21 @@ export function CommandMenu({
     return () => document.removeEventListener("keydown", down);
   }, []);
 
+  // Debounced server search; a sequence guard drops stale responses.
+  React.useEffect(() => {
+    if (plane !== "org") return;
+    if (query.trim().length < 2) {
+      setHits([]);
+      return;
+    }
+    const seq = ++searchSeq.current;
+    const t = setTimeout(async () => {
+      const results = await searchDocuments(query);
+      if (seq === searchSeq.current) setHits(results);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query, plane]);
+
   const groups = plane === "platform" ? platformNav : orgNav;
   const canSee = (item: NavItem) => !item.roles || item.roles.some((r) => roles.includes(r));
   const navItems = [
@@ -60,6 +75,7 @@ export function CommandMenu({
 
   const go = (href: string) => {
     setOpen(false);
+    setQuery("");
     router.push(href);
   };
 
@@ -76,8 +92,12 @@ export function CommandMenu({
         <CommandShortcut className="hidden sm:inline">⌘K</CommandShortcut>
       </Button>
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Type a command or search…" />
+      <CommandDialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQuery(""); }}>
+        <CommandInput
+          placeholder="Type a command or search documents…"
+          value={query}
+          onValueChange={setQuery}
+        />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Go to">
@@ -88,11 +108,11 @@ export function CommandMenu({
               </CommandItem>
             ))}
           </CommandGroup>
-          {documents.length > 0 && (
+          {hits.length > 0 && (
             <>
               <CommandSeparator />
               <CommandGroup heading="Documents">
-                {documents.map((d) => (
+                {hits.map((d) => (
                   <CommandItem
                     key={d.id}
                     value={`${d.number} ${d.title}`}

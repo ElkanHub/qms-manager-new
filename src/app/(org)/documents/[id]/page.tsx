@@ -7,7 +7,7 @@ import { RoleGate } from "@/components/app/role-gate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { GraduationCap, MoreHorizontal } from "lucide-react";
 import { Viewer } from "./Viewer";
 
 // D-READ — the core document read view. Opens the CURRENT EFFECTIVE version,
@@ -44,6 +44,11 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
       </div>
     );
   }
+
+  // Training seam, display side: reading stays open; performing is what's
+  // blocked (the transactional guard is app.enforce_trained_for_execution).
+  const { data: training } = await supabase.rpc("my_training_status", { p_document: id });
+  const trainingBlocked = (training as { blocked?: boolean } | null)?.blocked === true;
 
   const rev = String(doc.revision_number ?? 0).padStart(2, "0");
   const date = doc.effective_from
@@ -91,6 +96,20 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
           </>
         }
       />
+
+      {trainingBlocked && (
+        <Alert variant="destructive">
+          <GraduationCap className="size-4" />
+          <AlertTitle>Training required on this revision</AlertTitle>
+          <AlertDescription>
+            You may read this document, but you must not perform against it until your
+            training is complete.{" "}
+            <Link href="/training" className="font-medium underline underline-offset-4">
+              Go to my training
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="document">
         <TabsList>

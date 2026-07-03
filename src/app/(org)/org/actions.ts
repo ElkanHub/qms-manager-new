@@ -131,3 +131,30 @@ export async function setRetentionPeriod(formData: FormData): Promise<Result> {
   revalidatePath("/org/modules");
   return { ok: true, message: "Retention period saved." };
 }
+
+export type ImportReport = {
+  dry_run: boolean;
+  total: number;
+  importable: number;
+  imported: number;
+  errors: { row: number; number: string | null; problems: string[] }[];
+  duplicate_numbers_existing: string[];
+  duplicate_numbers_in_file: string[];
+};
+
+export async function importLegacyLibrary(
+  rows: Record<string, string>[],
+  dryRun: boolean,
+): Promise<{ ok: true; report: ImportReport } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("import_legacy_library", {
+    p_rows: rows,
+    p_dry_run: dryRun,
+  });
+  if (error) return { ok: false, error: error.message };
+  if (!dryRun) {
+    revalidatePath("/library/master");
+    revalidatePath("/org/import");
+  }
+  return { ok: true, report: data as ImportReport };
+}

@@ -67,6 +67,16 @@ export default async function ChangeWorkstation({ params }: { params: Promise<{ 
   const { data: sigs } = await supabase
     .from("signatures").select("role_key, signatory_id, signed_at, waived, waiver_reason").eq("change_control_id", id);
 
+  // The reconciliation gate's worklist: exactly the copies reconcile_cc counts.
+  const { data: outstandingCopies } =
+    cc.status === "pending_reconciliation"
+      ? await supabase.rpc("outstanding_copies_for_cc", { p_cc: id })
+      : { data: null };
+  const outstanding = (outstandingCopies ?? []) as {
+    copy_id: string; copy_number: number; holder: string; purpose: string | null;
+    document_number: string | null; title: string;
+  }[];
+
   const s = cc.status;
   const at = STAGE_AT[s] ?? 0;
   const isDetour = s === "clarification_requested" || s === "queued";
@@ -256,13 +266,39 @@ export default async function ChangeWorkstation({ params }: { params: Promise<{ 
 
       {/* D-RECONCILE */}
       {isQA && s === "pending_reconciliation" && (
-        <SectionCard title="Reconciliation" description="Confirms every issued controlled copy is accounted for. Trivially satisfied when the copy register module is off; force-override requires a reason.">
+        <SectionCard title="Reconciliation" description="Confirms every issued controlled copy of the outgoing versions is accounted for. Trivially satisfied when the copy register module is off.">
+          {outstanding.length > 0 ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>
+                <p className="mb-2 font-medium">
+                  {outstanding.length} controlled {outstanding.length === 1 ? "copy" : "copies"} still
+                  outstanding — reconcile {outstanding.length === 1 ? "it" : "them"} on the{" "}
+                  <a href="/copies" className="underline">register</a> first:
+                </p>
+                <ul className="space-y-1 text-sm">
+                  {outstanding.map((c) => (
+                    <li key={c.copy_id}>
+                      <span className="font-mono text-xs">#{c.copy_number}</span>{" "}
+                      {c.document_number ?? "—"} · {c.title} — held by <strong>{c.holder}</strong>
+                      {c.purpose ? ` (${c.purpose})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <p className="mb-4 text-sm text-muted-foreground">
+              Nothing outstanding on the copy register for the affected documents.
+            </p>
+          )}
           <ActionForm action={reconcile} submitLabel="Reconcile">
             <Cc id={id} />
-            <div className="space-y-1.5">
-              <Label htmlFor="force_reason">Force-override reason (only if copies unaccounted)</Label>
-              <Input id="force_reason" name="force_reason" />
-            </div>
+            {outstanding.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="force_reason">Force-override reason (recorded on the audit trail)</Label>
+                <Input id="force_reason" name="force_reason" />
+              </div>
+            )}
           </ActionForm>
         </SectionCard>
       )}

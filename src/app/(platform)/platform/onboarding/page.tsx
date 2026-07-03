@@ -18,6 +18,21 @@ const SAMPLE = JSON.stringify(
         { key: "shift", label: "Shift", type: "select", required: false, options: ["Day", "Night"] },
       ],
     },
+    // The canonical branding step: include it in the flow of the FIRST invited
+    // admin and their certificates/training decks come out branded from day one.
+    // The branding_* keys are recognized by the onboarding submit and written
+    // through set_tenant_branding (QA/org-admin only; skipped for others).
+    {
+      key: "branding",
+      title: "Your organization's look",
+      fields: [
+        { key: "branding_display_name", label: "Display name (on certificates)", type: "text", required: true },
+        { key: "branding_logo_url", label: "Logo URL (https, PNG/JPEG)", type: "text", required: false },
+        { key: "branding_color_primary", label: "Primary color", type: "color", required: false },
+        { key: "branding_color_secondary", label: "Secondary color", type: "color", required: false },
+        { key: "branding_color_accent", label: "Accent color", type: "color", required: false },
+      ],
+    },
   ],
   null,
   2,

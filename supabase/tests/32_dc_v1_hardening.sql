@@ -83,6 +83,11 @@ do $$ declare doc uuid; cc uuid; begin
 end $$;
 
 -- ============ (3) RETIREMENT pre-check: outstanding controlled copies block ============
+-- (register v2: issuing needs the module ON; the gate itself counts register
+-- rows unconditionally either way)
+insert into public.tenant_modules(tenant_id, module_key, enabled)
+  values ((select tenant_id from t),'controlled_copies', true)
+  on conflict (tenant_id, module_key) do update set enabled=true;
 do $$ declare doc uuid; ver uuid; cp uuid; ret uuid; begin
   doc := pg_temp.mkeff('Copies Gate');
   select id into ver from document_versions where document_id=doc and status='effective';

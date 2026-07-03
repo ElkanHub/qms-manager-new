@@ -86,6 +86,15 @@ export function IssueCopyDialog({
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="purpose">Purpose (optional)</Label>
+            <Input
+              id="purpose"
+              name="purpose"
+              placeholder="Why this copy is being distributed"
+            />
+          </div>
+
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>

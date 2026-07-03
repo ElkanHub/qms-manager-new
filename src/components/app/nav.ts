@@ -18,6 +18,7 @@ import {
   Users,
   Building2,
   Mail,
+  FileUp,
   Flag,
   UserCircle,
   ShieldCheck,
@@ -91,6 +92,7 @@ export const orgNav: NavGroup[] = [
       { label: "Departments", href: "/org/departments", icon: Building2, roles: ["qa", "org_admin"] },
       { label: "Invitations", href: "/org/invite", icon: Mail, roles: ["qa", "org_admin"] },
       { label: "Branding", href: "/org/branding", icon: Palette, roles: ["qa", "org_admin"] },
+      { label: "Legacy import", href: "/org/import", icon: FileUp, roles: ["qa", "org_admin"] },
     ],
   },
 ];
@@ -149,6 +151,7 @@ export const routeLabels: Record<string, string> = {
   "/org/classify": "Classification matrix",
   "/org/modules": "Retention & modules",
   "/org/access-grants": "Access grants",
+  "/org/import": "Legacy import",
   "/platform": "Platform",
   "/platform/provision": "Provision",
   "/platform/admins": "Admins",
@@ -176,4 +179,5 @@ export const routeGroup: Record<string, string> = {
   "/periodic": "Queues",
   "/copies": "Queues",
   "/audit": "Quality system",
+  "/org/import": "Administration",
 };
