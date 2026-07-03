@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CreateDepartmentDialog } from "./create-department-dialog";
+import { CodeInput } from "./code-input";
 import { HodSelect } from "./hod-select";
 
 // S-DEPARTMENTS — QA creates departments (QA exists as default) and assigns HODs.
@@ -47,6 +48,7 @@ export default async function Departments() {
             <TableHeader>
               <TableRow>
                 <TableHead>Department</TableHead>
+                <TableHead>Code</TableHead>
                 <TableHead>Head of department</TableHead>
               </TableRow>
             </TableHeader>
@@ -58,6 +60,13 @@ export default async function Departments() {
                       {d.name}
                       {d.is_default && <Badge variant="outline">org root</Badge>}
                     </span>
+                  </TableCell>
+                  <TableCell className="py-2.5">
+                    {isQA ? (
+                      <CodeInput departmentId={d.id} code={d.code} />
+                    ) : (
+                      <span className="font-mono text-sm text-muted-foreground">{d.code ?? "auto"}</span>
+                    )}
                   </TableCell>
                   <TableCell className="py-2.5">
                     {isQA ? (

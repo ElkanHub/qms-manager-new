@@ -13,13 +13,27 @@ export default async function NumberingConfig() {
   if (!(await getMyRoles()).includes("qa")) redirect("/org");
 
   const supabase = await createClient();
-  const { data: fmt } = await supabase.from("numbering_formats").select("format, next_seq").maybeSingle();
-  const initial = {
-    prefix: fmt?.format?.prefix ?? "SOP",
-    sep: fmt?.format?.sep ?? "-",
-    pad: fmt?.format?.pad ?? 3,
+  const [{ data: fmt }, { data: myDept }] = await Promise.all([
+    supabase.from("numbering_formats").select("format, next_seq").maybeSingle(),
+    supabase.from("departments").select("name, code").eq("is_default", true).maybeSingle(),
+  ]);
+
+  // Normalize either shape to v2 segments (mirrors app.numbering_segments).
+  type Segment =
+    | { type: "text"; value: string }
+    | { type: "department" }
+    | { type: "sequence"; pad: number };
+  const f = (fmt?.format ?? {}) as {
+    segments?: Segment[]; sep?: string; scope?: string; prefix?: string; pad?: number;
   };
+  const initialSegments: Segment[] = f.segments ?? [
+    { type: "text", value: f.prefix ?? "SOP" },
+    { type: "sequence", pad: f.pad ?? 3 },
+  ];
   const nextSeq = fmt?.next_seq ?? 1;
+  const sampleDeptCode =
+    myDept?.code?.toUpperCase() ??
+    (myDept?.name ?? "QA").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase();
 
   return (
     <div className="mx-auto max-w-lg space-y-6 p-2">
@@ -30,13 +44,23 @@ export default async function NumberingConfig() {
 
       <SectionCard
         title="Format editor"
-        description="Prefix, separator, and digit width. Module enable/disable is handled by the platform on the switchboard."
+        description="Arrange the pieces in your order — label, department tag, number — pick the separator and how the counter runs. Department codes come from the Departments page. Module enable/disable is handled by the platform on the switchboard."
       >
-        <NumberingEditor initial={initial} nextSeq={nextSeq} />
+        <NumberingEditor
+          initialSegments={initialSegments}
+          initialSep={f.sep ?? "-"}
+          initialScope={(f.scope as "tenant" | "department") ?? "tenant"}
+          nextSeq={nextSeq}
+          sampleDeptCode={sampleDeptCode}
+        />
       </SectionCard>
 
       <Alert>
-        <AlertDescription>Existing numbers are never rewritten.</AlertDescription>
+        <AlertDescription>
+          Existing numbers are never rewritten — a format change applies to new documents only.
+          New documents are numbered the moment their starter request is dispatched, carrying the
+          originating department's tag.
+        </AlertDescription>
       </Alert>
     </div>
   );
