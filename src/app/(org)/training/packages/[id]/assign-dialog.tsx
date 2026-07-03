@@ -15,6 +15,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ActionForm } from "@/app/_components/ActionForm";
 import { assignPackage } from "../../actions";
 
@@ -23,11 +30,14 @@ import { assignPackage } from "../../actions";
 export function AssignDialog({
   packageId,
   users,
+  departments,
 }: {
   packageId: string;
   users: { id: string; label: string }[];
+  departments: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [department, setDepartment] = useState<string>("");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -47,7 +57,24 @@ export function AssignDialog({
         </DialogHeader>
         <ActionForm action={assignPackage} submitLabel="Assign">
           <input type="hidden" name="package_id" value={packageId} />
-          <ScrollArea className="h-56 rounded-md border p-3">
+          {department && <input type="hidden" name="department_id" value={department} />}
+          <div className="space-y-2">
+            <Label>Whole department (optional — combines with individuals below)</Label>
+            <Select value={department || "none"} onValueChange={(v) => setDepartment(v === "none" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="No department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No department</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name} — every active member
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <ScrollArea className="h-48 rounded-md border p-3">
             <div className="space-y-2">
               {users.map((u) => (
                 <div key={u.id} className="flex items-center gap-2">

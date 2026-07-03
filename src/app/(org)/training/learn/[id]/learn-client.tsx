@@ -48,7 +48,25 @@ type Cert = { certificate_uid: string; score: number; issued_at: string } | null
 // progress saved server-side as you advance, assessment only after the deck,
 // score + certificate on pass. Branding colors apply when the tenant has them;
 // neutral tokens otherwise.
-export function LearnClient({ content, certificate }: { content: Content; certificate: Cert }) {
+// Per-template visual treatment (plan §5: 5 platform templates). Token-based;
+// tenant colors layer on top when present.
+const TEMPLATE_STYLE: Record<string, { card: string; title: string; body: string; step: boolean }> = {
+  "clean-corporate": { card: "min-h-[16rem]", title: "", body: "text-sm leading-6", step: false },
+  "visual-steps": { card: "min-h-[16rem] border-l-4 border-l-status-scheduled", title: "", body: "text-sm leading-6", step: true },
+  "compact-brief": { card: "min-h-[10rem]", title: "text-base", body: "text-sm leading-5", step: false },
+  "detailed-walkthrough": { card: "min-h-[20rem]", title: "", body: "text-[15px] leading-7", step: false },
+  "change-summary": { card: "min-h-[16rem] border-l-4 border-l-status-blocked", title: "", body: "text-sm leading-6", step: false },
+};
+
+export function LearnClient({
+  content,
+  certificate,
+  preview = false,
+}: {
+  content: Content;
+  certificate: Cert;
+  preview?: boolean;
+}) {
   const slides = content.slides;
   const startIndex = useMemo(() => {
     if (content.progress_pct >= 100) return slides.length - 1;
@@ -69,6 +87,11 @@ export function LearnClient({ content, certificate }: { content: Content; certif
 
   function advance(next: number) {
     setIndex(next);
+    if (preview) {
+      // Preview never writes: the trainer is looking, not training.
+      if (next === index && index === slides.length - 1) setPhase("assessment");
+      return;
+    }
     const newPct = Math.round(((next + 1) / slides.length) * 100);
     startTransition(async () => {
       const res = await saveProgress(content.assignment_id, newPct);
@@ -159,6 +182,26 @@ export function LearnClient({ content, certificate }: { content: Content; certif
   }
 
   if (phase === "assessment") {
+    if (preview) {
+      return (
+        <div>
+          {header}
+          <Progress value={100} className="mb-4" />
+          <Card>
+            <CardContent className="space-y-3 p-6">
+              <p className="text-sm text-muted-foreground">
+                End of deck. A trainee now takes the {content.question_count}-question assessment
+                (pass mark {content.pass_mark}%). Questions are never shown in preview with their
+                answers exposed — review them on the package screen.
+              </p>
+              <Button variant="outline" onClick={() => { setPhase("slides"); setIndex(0); }}>
+                Restart preview
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <div>
         {header}
@@ -229,21 +272,32 @@ export function LearnClient({ content, certificate }: { content: Content; certif
   }
 
   const slide = slides[index];
+  const style = TEMPLATE_STYLE[content.template] ?? TEMPLATE_STYLE["clean-corporate"];
   return (
     <div>
       {header}
+      {preview && (
+        <Badge variant="outline" className="mb-2">Preview — nothing is recorded</Badge>
+      )}
       <div className="mb-4 space-y-1">
         <Progress value={pct} aria-label={`Slide progress ${pct}%`} />
         <p className="text-right text-xs tabular-nums text-muted-foreground">
           Slide {index + 1} of {slides.length}
         </p>
       </div>
-      <Card className="min-h-[16rem]">
+      <Card className={style.card}>
         <CardHeader>
-          <CardTitle style={accent ? { color: accent } : undefined}>{slide?.title}</CardTitle>
+          <CardTitle className={style.title} style={accent ? { color: accent } : undefined}>
+            {style.step && (
+              <span className="mr-3 inline-flex size-8 items-center justify-center rounded-full bg-status-scheduled/15 text-base tabular-nums text-status-scheduled">
+                {index + 1}
+              </span>
+            )}
+            {slide?.title}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-wrap text-sm leading-6">{slide?.body}</p>
+          <p className={"whitespace-pre-wrap " + style.body}>{slide?.body}</p>
         </CardContent>
       </Card>
       <div className="mt-4 flex items-center justify-between">
@@ -258,7 +312,7 @@ export function LearnClient({ content, certificate }: { content: Content; certif
           <Button onClick={() => advance(index)} disabled={pending}
             style={accent ? { backgroundColor: accent } : undefined}>
             {pending && <Loader2 className="animate-spin" />}
-            Finish slides → assessment
+            {preview ? "End of deck" : "Finish slides → assessment"}
           </Button>
         )}
       </div>

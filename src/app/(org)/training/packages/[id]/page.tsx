@@ -38,12 +38,13 @@ export default async function PackageReview({ params }: { params: Promise<{ id: 
     );
   }
 
-  const [{ data: doc }, { data: slides }, { data: questions }, { data: users }, { data: aiLog }] =
+  const [{ data: doc }, { data: slides }, { data: questions }, { data: users }, { data: departments }, { data: aiLog }] =
     await Promise.all([
       supabase.from("documents").select("document_number, title").eq("id", pkg.document_id).maybeSingle(),
       supabase.from("training_slides").select("id, position, title, body, ai_draft").eq("package_id", id).order("position"),
       supabase.from("training_questions").select("id, position, question, options, correct_index, explanation, ai_draft").eq("package_id", id).order("position"),
       supabase.from("users").select("id, email, full_name").eq("status", "active").eq("plane", "org").order("email"),
+      supabase.from("departments").select("id, name").order("name"),
       supabase.from("ai_gateway_log").select("provider, model_version, status, requested_at").eq("package_id", id).order("requested_at", { ascending: false }).limit(1),
     ]);
 
@@ -63,6 +64,9 @@ export default async function PackageReview({ params }: { params: Promise<{ id: 
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge value={pkg.state} kind="training" />
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/training/packages/${pkg.id}/preview`}>Preview as trainee</Link>
+            </Button>
             {editable && (
               <ActionForm action={approvePackage} submitLabel="Approve package">
                 <input type="hidden" name="package_id" value={pkg.id} />
@@ -72,6 +76,7 @@ export default async function PackageReview({ params }: { params: Promise<{ id: 
               <AssignDialog
                 packageId={pkg.id}
                 users={(users ?? []).map((u) => ({ id: u.id, label: u.full_name ?? u.email }))}
+                departments={departments ?? []}
               />
             )}
             <ReasonDialog

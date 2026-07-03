@@ -80,11 +80,18 @@ begin
     '[{"question":"When is line clearance performed?","options":["Before filling","After filling","Never"],"correct_index":0},
       {"question":"Who approves deviations?","options":["Anyone","QA","The intern"],"correct_index":1},
       {"question":"What is worn in the filling suite?","options":["Street clothes","Sterile gown"],"correct_index":1}]'::jsonb,
-    'gemini','gemini-2.5-flash-test');
+    'gemini','gemini-2.5-flash-test', 'the pasted SOP grounding text',
+    '{"prompt_tokens":500,"completion_tokens":277,"total_tokens":777}'::jsonb);
   perform assert((select state from training_packages where id=p) = 'draft_review',
     'AI output lands as a DRAFT awaiting human review');
   perform assert((select count(*) from ai_gateway_log where package_id=p and status='success') = 1,
     'AI provenance logged (operation, provider, model, requester, version)');
+  perform assert((select total_tokens from ai_gateway_log where package_id=p and status='success') = 777,
+    'token usage is metered on the provenance log (billing/insight substrate)');
+  perform assert((public.ai_usage_guard()->>'used_last_hour')::int >= 1,
+    'the rate guard reads live per-tenant usage');
+  perform assert(((public.ai_usage_summary(30))->'totals'->>'total_tokens')::int = 777,
+    'tenant usage summary aggregates tokens');
 
   -- Human gate: an unapproved package can NEVER be assigned.
   begin
@@ -104,10 +111,29 @@ begin
   perform public.reorder_training_slides(p, array[s1, s3, s2]);
   perform assert((select title from training_slides where package_id=p and position=2) = 'Critical points',
     'drag-and-drop order persists');
+  -- Insert AT a position: everything below shifts, numbering stays contiguous.
+  perform public.add_training_slide(p, 'Inserted', 'between one and two', 2);
+  perform assert((select title from training_slides where package_id=p and position=2) = 'Inserted'
+             and (select title from training_slides where package_id=p and position=3) = 'Critical points',
+    'insert-at-position shifts the deck down automatically');
+  perform assert((select array_agg(position order by position) from training_slides where package_id=p)
+                 = (select array_agg(g) from generate_series(1, (select count(*)::int from training_slides where package_id=p)) g),
+    'slide numbering is contiguous and self-checking');
+  perform public.delete_training_slide((select id from training_slides where package_id=p and position=2));
+  perform assert((select array_agg(position order by position) from training_slides where package_id=p)
+                 = array[1,2,3], 'delete compacts the numbering back');
   select id into q_del from training_questions where package_id=p and position=3;
   perform public.delete_training_question(q_del);
   perform public.add_training_question(p, 'What gown is worn in the filling suite?',
     '["Street clothes","Sterile gown","Lab coat"]'::jsonb, 1, 'Gowning SOP section 4.');
+  -- Insert a question at position 1, then remove it: numbering self-checks both ways.
+  perform public.add_training_question(p, 'Temp first question?', '["A","B"]'::jsonb, 0, null, 1);
+  perform assert((select question from training_questions where package_id=p and position=1) = 'Temp first question?'
+             and (select count(*) from training_questions where package_id=p) = 4,
+    'insert-at-position works for questions');
+  perform public.delete_training_question((select id from training_questions where package_id=p and position=1));
+  perform assert((select array_agg(position order by position) from training_questions where package_id=p)
+                 = array[1,2,3], 'question numbering compacts automatically');
   perform assert((select count(*) from training_questions where package_id=p) = 3, 'three questions after polish');
 
   perform public.approve_training_package(p);
@@ -255,6 +281,37 @@ begin
       (select ver from pg_temp.doc)), 'training on rev 00 stands for rev 00');
   perform assert(not app.is_user_trained('77770000-0000-0000-0000-000000000005', v2),
     'training on rev 00 does NOT count for rev 01');
+end $$;
+
+-- ============ Seam event: supersession AUTO-CLOSES the old package ============
+do $$ declare v2 uuid; p2 uuid; n int;
+begin
+  select id into v2 from document_versions
+    where document_id = (select id from pg_temp.doc) and status = 'approved';
+  -- finish the rev-01 package so it is assignable
+  perform pg_temp.as_user('77770000-0000-0000-0000-000000000004');
+  select id into p2 from training_packages where document_version_id = v2;
+  perform public.store_ai_draft(p2,
+    '[{"title":"What changed","body":"Rev 01 tightens line clearance."}]'::jsonb,
+    '[{"question":"What did rev 01 change?","options":["Line clearance","Nothing"],"correct_index":0}]'::jsonb,
+    'gemini','gemini-2.5-flash-test');
+  perform public.approve_training_package(p2);
+  -- bulk assignment: whole department in one audited call
+  n := public.assign_training_package(p2, null, null, (select qa_department_id from t), null);
+  perform assert(n = 7, 'assign-by-department resolves every active member (7)');
+
+  -- make rev 01 effective → rev 00 superseded → its package closes itself
+  perform app.make_effective(v2, gen_random_uuid());
+  perform assert((select status from document_versions where id = (select ver from pg_temp.doc)) = 'superseded',
+    'rev 00 superseded by rev 01');
+  perform assert((select state from training_packages
+                  where document_version_id = (select ver from pg_temp.doc)) = 'closed',
+    'the superseded version''s package auto-closed (seam event)');
+  perform assert(exists(select 1 from audit_trail where action = 'training.package_autoclosed'),
+    'the auto-close is on the audit spine');
+  -- completion is HISTORY: closing never revokes trained status for that version
+  perform assert(app.is_user_trained('77770000-0000-0000-0000-000000000005', (select ver from pg_temp.doc)),
+    'training completed on rev 00 remains on record after the package closes');
 end $$;
 
 -- ============ Trainer-only content: RLS hides questions from trainees ============

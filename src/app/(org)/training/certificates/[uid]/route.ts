@@ -30,7 +30,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ uid
     supabase.from("users").select("full_name, email").eq("id", cert.trainee_id).maybeSingle(),
     supabase
       .from("tenant_branding")
-      .select("org_display_name, color_primary, color_secondary")
+      .select("org_display_name, logo_ref, color_primary, color_secondary")
       .maybeSingle(),
   ]);
   const { data: org } = await supabase.from("organizations").select("name").maybeSingle();
@@ -51,12 +51,35 @@ export async function GET(_request: Request, { params }: { params: Promise<{ uid
     page.drawText(text, { x: (width - w) / 2, y, size, font, color });
   };
 
+  // Org logo (when configured and reachable): fetched server-side with a tight
+  // timeout and size cap; any failure falls back to the text header.
+  let logoDrawn = false;
+  const logoRef = branding?.logo_ref;
+  if (logoRef && /^https?:\/\//i.test(logoRef)) {
+    try {
+      const res = await fetch(logoRef, { signal: AbortSignal.timeout(3000) });
+      const type = res.headers.get("content-type") ?? "";
+      if (res.ok && /image\/(png|jpe?g)/i.test(type)) {
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (bytes.byteLength <= 1_000_000) {
+          const img = /png/i.test(type) ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes);
+          const h = 42;
+          const w = (img.width / img.height) * h;
+          page.drawImage(img, { x: (width - w) / 2, y: height - 78 - h / 2, width: w, height: h });
+          logoDrawn = true;
+        }
+      }
+    } catch {
+      // fall through to the text header
+    }
+  }
+
   // Frame
   page.drawRectangle({ x: 24, y: 24, width: width - 48, height: height - 48, borderColor: primary, borderWidth: 2 });
   page.drawRectangle({ x: 32, y: 32, width: width - 64, height: height - 64, borderColor: secondary, borderWidth: 0.5 });
 
-  center(orgName.toUpperCase(), height - 92, sansBold, 14, primary);
-  center("CERTIFICATE OF TRAINING", height - 150, serif, 34, primary);
+  center(orgName.toUpperCase(), logoDrawn ? height - 122 : height - 92, sansBold, logoDrawn ? 11 : 14, primary);
+  center("CERTIFICATE OF TRAINING", height - 158, serif, 34, primary);
   center("This certifies that", height - 195, sans, 12);
   center(trainee?.full_name ?? trainee?.email ?? "Trainee", height - 228, serif, 24, primary);
   center("has completed training and passed the assessment for", height - 258, sans, 12);

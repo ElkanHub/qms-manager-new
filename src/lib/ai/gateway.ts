@@ -21,7 +21,12 @@ export type GatewayQuestion = {
   correct_index: number;
   explanation?: string;
 };
-export type GeneratedPackage = { slides: GatewaySlide[]; questions: GatewayQuestion[] };
+export type GatewayUsage = { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+export type GeneratedPackage = {
+  slides: GatewaySlide[];
+  questions: GatewayQuestion[];
+  usage: GatewayUsage;
+};
 
 export type GenerationInput = {
   document: { number: string | null; title: string; revision: number | null };
@@ -139,9 +144,26 @@ const QUESTIONS_SCHEMA = {
 // Providers. Adding one = adding an entry here (§3.2); nothing outside the
 // gateway changes.
 // ---------------------------------------------------------------------------
-type ProviderCall = (model: string, prompt: string, schema: object) => Promise<unknown>;
+type ProviderResult = { data: unknown; usage: GatewayUsage };
+type ProviderCall = (model: string, prompt: string, schema: object) => Promise<ProviderResult>;
 
-async function callGemini(model: string, prompt: string, schema: object): Promise<unknown> {
+// Transient provider failures retry with backoff before surfacing (§3.5).
+const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
+async function withRetry(fn: () => Promise<ProviderResult>): Promise<ProviderResult> {
+  const delays = [1000, 3000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      const transient = status ? RETRYABLE.has(status) : e instanceof TypeError; // network
+      if (!transient || attempt >= delays.length) throw e;
+      await new Promise((r) => setTimeout(r, delays[attempt]));
+    }
+  }
+}
+
+async function callGemini(model: string, prompt: string, schema: object): Promise<ProviderResult> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     throw new Error("GEMINI_API_KEY is not configured on the server");
@@ -164,14 +186,24 @@ async function callGemini(model: string, prompt: string, schema: object): Promis
   );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Gemini returned ${res.status}: ${body.slice(0, 300)}`);
+    const err = new Error(`Gemini returned ${res.status}: ${body.slice(0, 300)}`);
+    (err as unknown as { status: number }).status = res.status;
+    throw err;
   }
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
   };
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Gemini returned no content");
-  return JSON.parse(text);
+  return {
+    data: JSON.parse(text),
+    usage: {
+      prompt_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+      completion_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+      total_tokens: data.usageMetadata?.totalTokenCount ?? 0,
+    },
+  };
 }
 
 const PROVIDERS: Record<string, ProviderCall> = {
@@ -181,7 +213,15 @@ const PROVIDERS: Record<string, ProviderCall> = {
 // ---------------------------------------------------------------------------
 // Operations
 // ---------------------------------------------------------------------------
-function validatePackage(raw: unknown, questionCount: number): GeneratedPackage {
+function addUsage(a: GatewayUsage, b: GatewayUsage): GatewayUsage {
+  return {
+    prompt_tokens: a.prompt_tokens + b.prompt_tokens,
+    completion_tokens: a.completion_tokens + b.completion_tokens,
+    total_tokens: a.total_tokens + b.total_tokens,
+  };
+}
+
+function validatePackage(raw: unknown, questionCount: number): Omit<GeneratedPackage, "usage"> {
   const slides = ((raw as { slides?: unknown[] }).slides ?? []) as GatewaySlide[];
   const questions = ((raw as { questions?: unknown[] }).questions ?? []) as GatewayQuestion[];
   const cleanSlides = slides
@@ -212,14 +252,52 @@ export async function generateTrainingPackage(
   const call = PROVIDERS[config.provider];
   if (!call) throw new GatewayError(`unknown AI provider "${config.provider}"`, config.provider, config.model);
   try {
-    const [slidesRaw, questionsRaw] = await Promise.all([
-      call(config.model, slidePrompt(input), SLIDES_SCHEMA),
-      call(config.model, questionPrompt(input, input.questionCount), QUESTIONS_SCHEMA),
+    const [slidesRes, questionsRes] = await Promise.all([
+      withRetry(() => call(config.model, slidePrompt(input), SLIDES_SCHEMA)),
+      withRetry(() => call(config.model, questionPrompt(input, input.questionCount), QUESTIONS_SCHEMA)),
     ]);
-    return validatePackage(
-      { ...(slidesRaw as object), ...(questionsRaw as object) },
-      input.questionCount,
-    );
+    return {
+      ...validatePackage(
+        { ...(slidesRes.data as object), ...(questionsRes.data as object) },
+        input.questionCount,
+      ),
+      usage: addUsage(slidesRes.usage, questionsRes.usage),
+    };
+  } catch (e) {
+    throw new GatewayError(e instanceof Error ? e.message : String(e), config.provider, config.model);
+  }
+}
+
+// AI-complete: the trainer wrote a question — generate the options, the correct
+// answer, and an explanation, grounded strictly in the document text. Also used
+// to regenerate a single question. Returns usage for metering.
+export async function completeQuestion(
+  config: GatewayConfig,
+  input: GenerationInput & { questionText?: string },
+): Promise<{ question: GatewayQuestion; usage: GatewayUsage }> {
+  const call = PROVIDERS[config.provider];
+  if (!call) throw new GatewayError(`unknown AI provider "${config.provider}"`, config.provider, config.model);
+  const prompt = input.questionText
+    ? [
+        `You are completing a GxP training assessment question written by a trainer.`,
+        `Document: ${input.document.number ?? "(unnumbered)"} — ${input.document.title}`,
+        ``,
+        `The trainer's question: "${input.questionText}"`,
+        `Produce exactly 1 question: keep the trainer's wording (light grammar fixes only),`,
+        `write 3–4 plausible options, mark the correct one (zero-based index), and give a`,
+        `one-line explanation referencing the document.`,
+        `STRICT GROUNDING RULE: the correct answer MUST come from the document text below.`,
+        `If the document does not answer the question, return an empty questions array.`,
+        ``,
+        `--- DOCUMENT TEXT ---`,
+        input.sourceText,
+        `--- END DOCUMENT TEXT ---`,
+      ].join("\n")
+    : questionPrompt(input, 1);
+  try {
+    const res = await withRetry(() => call(config.model, prompt, QUESTIONS_SCHEMA));
+    const pkg = validatePackage({ slides: [{ title: "-", body: "-" }], ...(res.data as object) }, 1);
+    return { question: pkg.questions[0], usage: res.usage };
   } catch (e) {
     throw new GatewayError(e instanceof Error ? e.message : String(e), config.provider, config.model);
   }
@@ -228,14 +306,6 @@ export async function generateTrainingPackage(
 export async function generateSingleQuestion(
   config: GatewayConfig,
   input: GenerationInput,
-): Promise<GatewayQuestion> {
-  const call = PROVIDERS[config.provider];
-  if (!call) throw new GatewayError(`unknown AI provider "${config.provider}"`, config.provider, config.model);
-  try {
-    const raw = await call(config.model, questionPrompt(input, 1), QUESTIONS_SCHEMA);
-    const pkg = validatePackage({ slides: [{ title: "-", body: "-" }], ...(raw as object) }, 1);
-    return pkg.questions[0];
-  } catch (e) {
-    throw new GatewayError(e instanceof Error ? e.message : String(e), config.provider, config.model);
-  }
+): Promise<{ question: GatewayQuestion; usage: GatewayUsage }> {
+  return completeQuestion(config, input);
 }

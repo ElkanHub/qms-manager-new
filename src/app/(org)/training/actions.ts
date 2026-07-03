@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   GatewayError,
+  completeQuestion,
   generateSingleQuestion,
   generateTrainingPackage,
   type GatewayConfig,
@@ -25,8 +26,16 @@ async function gatewayConfig(): Promise<GatewayConfig> {
 // T-PACKAGES: create the package, run the gateway, land the draft. AI failure
 // never dead-ends (plan §3.5): the package drops to draft review for manual
 // authoring or retry, with the failure on the provenance log.
+async function usageGuard(): Promise<string | null> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("ai_usage_guard");
+  return error ? error.message : null;
+}
+
 export async function generatePackage(formData: FormData): Promise<Result> {
   const supabase = await createClient();
+  const guard = await usageGuard();
+  if (guard) return { ok: false, error: guard };
   const sourceText = String(formData.get("source_text") || "").trim();
   if (sourceText.length < 100) {
     return { ok: false, error: "Paste the document's content (at least a few paragraphs) — slides and questions are generated strictly from it." };
@@ -60,6 +69,7 @@ export async function generatePackage(formData: FormData): Promise<Result> {
       p_provider: config.provider,
       p_model: config.model,
       p_source_text: sourceText,
+      p_usage: generated.usage,
     });
     if (storeError) return { ok: false, error: storeError.message };
   } catch (e) {
@@ -84,6 +94,8 @@ export async function generatePackage(formData: FormData): Promise<Result> {
 // Retry generation on an existing draft (uses the stored grounding text).
 export async function regeneratePackage(formData: FormData): Promise<Result> {
   const supabase = await createClient();
+  const guard = await usageGuard();
+  if (guard) return { ok: false, error: guard };
   const packageId = String(formData.get("package_id"));
   const { data: pkg } = await supabase
     .from("training_packages")
@@ -115,6 +127,7 @@ export async function regeneratePackage(formData: FormData): Promise<Result> {
       p_provider: config.provider,
       p_model: config.model,
       p_source_text: sourceText,
+      p_usage: generated.usage,
     });
     if (error) return { ok: false, error: error.message };
   } catch (e) {
@@ -131,6 +144,8 @@ export async function regeneratePackage(formData: FormData): Promise<Result> {
 
 export async function regenerateQuestion(formData: FormData): Promise<Result> {
   const supabase = await createClient();
+  const guard = await usageGuard();
+  if (guard) return { ok: false, error: guard };
   const packageId = String(formData.get("package_id"));
   const questionId = String(formData.get("question_id"));
   const { data: pkg } = await supabase
@@ -145,7 +160,7 @@ export async function regenerateQuestion(formData: FormData): Promise<Result> {
     .from("documents").select("document_number, title").eq("id", pkg.document_id).maybeSingle();
   const config = await gatewayConfig();
   try {
-    const q = await generateSingleQuestion(config, {
+    const { question: q, usage } = await generateSingleQuestion(config, {
       document: { number: doc?.document_number ?? null, title: doc?.title ?? "", revision: null },
       sourceText: pkg.source_text,
       templateKey: pkg.template_key,
@@ -162,6 +177,7 @@ export async function regenerateQuestion(formData: FormData): Promise<Result> {
     await supabase.rpc("log_ai_call", {
       p_package: packageId, p_operation: "regenerate_question",
       p_provider: config.provider, p_model: config.model, p_output_ref: questionId,
+      p_usage: usage,
     });
   } catch (e) {
     return { ok: false, error: e instanceof GatewayError ? e.message : String(e) };
@@ -185,10 +201,12 @@ export async function updateSlide(formData: FormData): Promise<Result> {
 
 export async function addSlide(formData: FormData): Promise<Result> {
   const supabase = await createClient();
+  const position = String(formData.get("position") || "").trim();
   const { error } = await supabase.rpc("add_training_slide", {
     p_package: String(formData.get("package_id")),
     p_title: String(formData.get("title") || "New slide"),
     p_body: String(formData.get("body") || ""),
+    p_position: position ? Number(position) : null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/training/packages/${formData.get("package_id")}`);
@@ -233,12 +251,14 @@ export async function updateQuestion(formData: FormData): Promise<Result> {
 
 export async function addQuestion(formData: FormData): Promise<Result> {
   const supabase = await createClient();
+  const position = String(formData.get("position") || "").trim();
   const { error } = await supabase.rpc("add_training_question", {
     p_package: String(formData.get("package_id")),
     p_text: String(formData.get("question") || "New question"),
     p_options: ["Option A", "Option B"],
     p_correct_index: 0,
     p_explanation: null,
+    p_position: position ? Number(position) : null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/training/packages/${formData.get("package_id")}`);
@@ -264,6 +284,49 @@ export async function reorderQuestions(packageId: string, order: string[]): Prom
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/training/packages/${packageId}`);
   return { ok: true };
+}
+
+// AI-complete: the trainer wrote a question — the AI supplies grounded options,
+// the correct answer, and an explanation. Nothing is written until the trainer
+// saves (the human gate stands); the call itself is metered and logged.
+export async function completeQuestionOptions(
+  packageId: string,
+  questionText: string,
+): Promise<{ ok: true; question: unknown } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const guard = await usageGuard();
+  if (guard) return { ok: false, error: guard };
+  const { data: pkg } = await supabase
+    .from("training_packages")
+    .select("source_text, template_key, document_id")
+    .eq("id", packageId)
+    .maybeSingle();
+  if (!pkg?.source_text) {
+    return { ok: false, error: "No grounding text stored on this package — the AI can only answer from the document." };
+  }
+  const { data: doc } = await supabase
+    .from("documents").select("document_number, title").eq("id", pkg.document_id).maybeSingle();
+  const config = await gatewayConfig();
+  try {
+    const { question, usage } = await completeQuestion(config, {
+      document: { number: doc?.document_number ?? null, title: doc?.title ?? "", revision: null },
+      sourceText: pkg.source_text,
+      templateKey: pkg.template_key,
+      questionCount: 1,
+      questionText,
+    });
+    if (!question) {
+      return { ok: false, error: "The document does not answer this question — a question not answerable from the SOP is defective." };
+    }
+    await supabase.rpc("log_ai_call", {
+      p_package: packageId, p_operation: "complete_question",
+      p_provider: config.provider, p_model: config.model, p_output_ref: null,
+      p_usage: usage,
+    });
+    return { ok: true, question };
+  } catch (e) {
+    return { ok: false, error: e instanceof GatewayError ? e.message : String(e) };
+  }
 }
 
 // ---- Lifecycle ----
@@ -292,10 +355,14 @@ export async function assignPackage(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const users = formData.getAll("user_ids").map(String);
   const due = String(formData.get("due_at") || "");
+  const department = String(formData.get("department_id") || "");
+  const role = String(formData.get("role") || "");
   const { data, error } = await supabase.rpc("assign_training_package", {
     p_package: String(formData.get("package_id")),
-    p_users: users,
+    p_users: users.length ? users : null,
     p_due: due ? new Date(due).toISOString() : null,
+    p_department: department || null,
+    p_role: role || null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/training/packages");
