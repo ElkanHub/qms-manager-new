@@ -81,7 +81,7 @@ export default async function Changes() {
           { columnId: "status", title: "Status" },
           { columnId: "classification", title: "Class" },
         ]}
-        onRowHref={(r) => `/changes/${r.id}`}
+        rowHrefBase="/changes"
         emptyState={
           <EmptyState
             icon={GitPullRequestArrow}
