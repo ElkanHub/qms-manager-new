@@ -46,6 +46,8 @@ export default async function TrainingPackages() {
         .order("created_at", { ascending: false }),
       supabase.from("training_settings").select("pass_mark, max_attempts, default_due_days").maybeSingle(),
     ]);
+  const { data: aiUsage } = await supabase.rpc("ai_usage_summary", { p_days: 30 });
+  const aiTotals = (aiUsage as { totals?: { calls?: number; total_tokens?: number } } | null)?.totals;
 
   const candidates = ((candidatesRaw as Candidate[] | null) ?? []).filter((c) => !c.has_open_package);
   const docIds = [...new Set((packages ?? []).map((p) => p.document_id))];
@@ -163,6 +165,12 @@ export default async function TrainingPackages() {
           <p className="text-xs text-muted-foreground">
             Every attempt is recorded and never overwritten. Threshold % is platform switchboard
             configuration; ask via <Badge variant="outline">Modules</Badge> if it needs changing.
+            {aiTotals && (
+              <>
+                {" "}AI usage (30d): {aiTotals.calls ?? 0} calls ·{" "}
+                {(aiTotals.total_tokens ?? 0).toLocaleString()} tokens — metered on the provenance log.
+              </>
+            )}
           </p>
         </ActionForm>
       </SectionCard>

@@ -167,6 +167,9 @@ create table if not exists public.ai_gateway_log (
   status              text not null default 'success' check (status in ('success','error')),
   error               text,
   output_ref          text,                    -- pointer to what was produced (package id / counts)
+  prompt_tokens       int,                     -- usage metering (billing/insight substrate)
+  completion_tokens   int,
+  total_tokens        int,
   requested_at        timestamptz not null default now()
 );
 create index if not exists ai_log_tenant_idx on public.ai_gateway_log (tenant_id, requested_at);
@@ -402,7 +405,7 @@ end; $$;
 -- the provenance log row and the audit entry are written in the same call.
 create or replace function public.store_ai_draft(
   p_package uuid, p_slides jsonb, p_questions jsonb, p_provider text, p_model text,
-  p_source_text text default null)
+  p_source_text text default null, p_usage jsonb default null)
 returns void language plpgsql security definer set search_path = app, public as $$
 declare pk public.training_packages; v_caller uuid := auth.uid(); s jsonb; q jsonb; i int := 0;
 begin
@@ -440,11 +443,14 @@ begin
     set state = 'draft_review', source_text = coalesce(p_source_text, source_text)
     where id = p_package;
   insert into public.ai_gateway_log(tenant_id, operation, provider, model_version, requested_by,
-      document_version_id, package_id, status, output_ref)
+      document_version_id, package_id, status, output_ref,
+      prompt_tokens, completion_tokens, total_tokens)
     values (pk.tenant_id, 'generate_package', p_provider, p_model, v_caller,
             pk.document_version_id, p_package, 'success',
             jsonb_build_object('slides', jsonb_array_length(p_slides),
-                               'questions', jsonb_array_length(p_questions))::text);
+                               'questions', jsonb_array_length(p_questions))::text,
+            (p_usage->>'prompt_tokens')::int, (p_usage->>'completion_tokens')::int,
+            (p_usage->>'total_tokens')::int);
   perform app.write_audit('training.ai_generated', v_caller, null, pk.tenant_id, pk.org_id, pk.department_id,
     'training_package', p_package::text, null,
     jsonb_build_object('provider', p_provider, 'model', p_model,
@@ -477,7 +483,8 @@ end; $$;
 -- Any other gateway operation (e.g. regenerating one question) logs its
 -- provenance through the same append-only trail.
 create or replace function public.log_ai_call(
-  p_package uuid, p_operation text, p_provider text, p_model text, p_output_ref text default null)
+  p_package uuid, p_operation text, p_provider text, p_model text, p_output_ref text default null,
+  p_usage jsonb default null)
 returns void language plpgsql security definer set search_path = app, public as $$
 declare pk public.training_packages; v_caller uuid := auth.uid();
 begin
@@ -486,9 +493,51 @@ begin
     raise exception 'log_ai_call: no such package'; end if;
   if not app.is_trainer(v_caller) then raise exception 'log_ai_call: trainer/QA only'; end if;
   insert into public.ai_gateway_log(tenant_id, operation, provider, model_version, requested_by,
-      document_version_id, package_id, status, output_ref)
+      document_version_id, package_id, status, output_ref,
+      prompt_tokens, completion_tokens, total_tokens)
     values (pk.tenant_id, p_operation, p_provider, p_model, v_caller,
-            pk.document_version_id, p_package, 'success', p_output_ref);
+            pk.document_version_id, p_package, 'success', p_output_ref,
+            (p_usage->>'prompt_tokens')::int, (p_usage->>'completion_tokens')::int,
+            (p_usage->>'total_tokens')::int);
+end; $$;
+
+-- Per-tenant hourly rate guard: the metered doorway can throttle. Limit comes
+-- from platform gateway config (settings.tenant_hourly_limit, default 60).
+-- Callers check BEFORE spending provider tokens.
+create or replace function public.ai_usage_guard()
+returns jsonb language plpgsql stable security definer set search_path = app, public as $$
+declare v_tenant uuid := public.current_tenant_id(); v_limit int; v_used int;
+begin
+  if v_tenant is null then raise exception 'ai_usage_guard: org session required'; end if;
+  select coalesce((settings->>'tenant_hourly_limit')::int, 60) into v_limit from public.ai_gateway_config where id;
+  select count(*) into v_used from public.ai_gateway_log
+    where tenant_id = v_tenant and requested_at > now() - interval '1 hour';
+  if v_used >= v_limit then
+    raise exception 'AI usage limit reached for this hour (% of %). Try again later or author manually.', v_used, v_limit;
+  end if;
+  return jsonb_build_object('used_last_hour', v_used, 'limit', v_limit);
+end; $$;
+
+-- Tenant-side usage metrics (trainer/QA): the same log that bills also informs.
+create or replace function public.ai_usage_summary(p_days int default 30)
+returns jsonb language plpgsql stable security definer set search_path = app, public as $$
+declare v_tenant uuid := public.current_tenant_id(); v_rows jsonb; v_totals jsonb;
+begin
+  if v_tenant is null or not app.is_trainer(auth.uid()) then
+    raise exception 'ai_usage_summary: trainer/QA only'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('operation', operation, 'model', model_version,
+           'calls', n, 'errors', errs, 'total_tokens', toks)), '[]'::jsonb) into v_rows
+    from (select operation, model_version, count(*) n,
+                 count(*) filter (where status='error') errs,
+                 coalesce(sum(total_tokens),0) toks
+          from public.ai_gateway_log
+          where tenant_id = v_tenant and requested_at > now() - make_interval(days => greatest(p_days,1))
+          group by 1,2 order by n desc) t;
+  select jsonb_build_object('calls', count(*), 'errors', count(*) filter (where status='error'),
+           'total_tokens', coalesce(sum(total_tokens),0)) into v_totals
+    from public.ai_gateway_log
+    where tenant_id = v_tenant and requested_at > now() - make_interval(days => greatest(p_days,1));
+  return jsonb_build_object('window_days', p_days, 'totals', v_totals, 'by_operation', v_rows);
 end; $$;
 
 -- Editing — draft_review only (the trainer polishing the draft, §5/§6).
@@ -519,12 +568,16 @@ begin
     jsonb_build_object('title', p_title), null, 'T-REVIEW');
 end; $$;
 
-create or replace function public.add_training_slide(p_package uuid, p_title text default '', p_body text default '')
+create or replace function public.add_training_slide(
+  p_package uuid, p_title text default '', p_body text default '', p_position int default null)
 returns uuid language plpgsql security definer set search_path = app, public as $$
-declare pk public.training_packages; v_caller uuid := auth.uid(); v_id uuid; v_pos int;
+declare pk public.training_packages; v_caller uuid := auth.uid(); v_id uuid; v_pos int; v_max int;
 begin
   pk := app.editable_package(p_package, v_caller);
-  select coalesce(max(position),0)+1 into v_pos from public.training_slides where package_id = p_package;
+  select coalesce(max(position),0) into v_max from public.training_slides where package_id = p_package;
+  v_pos := least(greatest(coalesce(p_position, v_max + 1), 1), v_max + 1);
+  update public.training_slides set position = position + 1
+    where package_id = p_package and position >= v_pos;      -- auto-renumber on insert
   insert into public.training_slides(tenant_id, package_id, position, title, body, edited_by)
     values (pk.tenant_id, p_package, v_pos, p_title, p_body, v_caller) returning id into v_id;
   perform app.write_audit('training.slide_added', v_caller, null, pk.tenant_id, pk.org_id, pk.department_id,
@@ -584,16 +637,20 @@ begin
 end; $$;
 
 create or replace function public.add_training_question(
-  p_package uuid, p_text text, p_options jsonb, p_correct_index int, p_explanation text default null)
+  p_package uuid, p_text text, p_options jsonb, p_correct_index int, p_explanation text default null,
+  p_position int default null)
 returns uuid language plpgsql security definer set search_path = app, public as $$
-declare pk public.training_packages; v_caller uuid := auth.uid(); v_id uuid; v_pos int;
+declare pk public.training_packages; v_caller uuid := auth.uid(); v_id uuid; v_pos int; v_max int;
 begin
   pk := app.editable_package(p_package, v_caller);
   if jsonb_typeof(p_options) <> 'array' or jsonb_array_length(p_options) < 2 then
     raise exception 'add_training_question: at least two options required'; end if;
   if p_correct_index not between 0 and jsonb_array_length(p_options) - 1 then
     raise exception 'add_training_question: correct_index out of range'; end if;
-  select coalesce(max(position),0)+1 into v_pos from public.training_questions where package_id = p_package;
+  select coalesce(max(position),0) into v_max from public.training_questions where package_id = p_package;
+  v_pos := least(greatest(coalesce(p_position, v_max + 1), 1), v_max + 1);
+  update public.training_questions set position = position + 1
+    where package_id = p_package and position >= v_pos;      -- auto-renumber on insert
   insert into public.training_questions(tenant_id, package_id, position, question, options, correct_index, explanation, edited_by)
     values (pk.tenant_id, p_package, v_pos, p_text, p_options, p_correct_index, p_explanation, v_caller)
     returning id into v_id;
@@ -678,10 +735,11 @@ end; $$;
 -- Assignment (plan §4 step 2) — approved packages only.
 -- ---------------------------------------------------------------------------
 create or replace function public.assign_training_package(
-  p_package uuid, p_users uuid[], p_due timestamptz default null)
+  p_package uuid, p_users uuid[] default null, p_due timestamptz default null,
+  p_department uuid default null, p_role text default null)
 returns int language plpgsql security definer set search_path = app, public as $$
 declare pk public.training_packages; v_caller uuid := auth.uid(); v_due timestamptz;
-        v_user uuid; v_n int := 0; v_days int;
+        v_user uuid; v_n int := 0; v_days int; v_targets uuid[];
 begin
   select * into pk from public.training_packages where id = p_package for update;
   if pk.id is null or pk.tenant_id is distinct from public.current_tenant_id() then
@@ -689,8 +747,23 @@ begin
   if not app.is_trainer(v_caller) then raise exception 'assign_training_package: trainer/QA only'; end if;
   if pk.state not in ('approved','assigned') then
     raise exception 'assign_training_package: only an APPROVED package can be assigned (state is %) — the human gate is not optional', pk.state; end if;
-  if coalesce(array_length(p_users, 1), 0) = 0 then
-    raise exception 'assign_training_package: no trainees given'; end if;
+
+  -- Population resolution (individuals ∪ department members ∪ role holders),
+  -- resolved server-side at assignment time; each row is audited individually.
+  select coalesce(array_agg(distinct u), '{}') into v_targets from (
+    select unnest(coalesce(p_users, '{}'::uuid[])) u
+    union
+    select id from public.users
+      where p_department is not null and tenant_id = pk.tenant_id and plane = 'org'
+        and status = 'active' and department_id = p_department
+    union
+    select ur.user_id from public.user_roles ur
+      join public.users uu on uu.id = ur.user_id
+      where p_role is not null and ur.tenant_id = pk.tenant_id and ur.role = p_role
+        and uu.status = 'active' and uu.plane = 'org') t(u);
+  if coalesce(array_length(v_targets, 1), 0) = 0 then
+    raise exception 'assign_training_package: no trainees resolved'; end if;
+  p_users := v_targets;
 
   select coalesce((select default_due_days from public.training_settings where tenant_id = pk.tenant_id), 14)
     into v_days;
@@ -784,6 +857,36 @@ returns int language sql stable security definer set search_path = app, public a
     (select pass_mark from public.training_settings where tenant_id = p_tenant),
     80);
 $$;
+
+-- Trainer preview: the exact payload a trainee would receive, no assignment
+-- needed and nothing mutated — so the trainer sees what ships before approving.
+create or replace function public.get_package_preview(p_package uuid)
+returns jsonb language plpgsql stable security definer set search_path = app, public as $$
+declare pk public.training_packages; v_slides jsonb; v_doc jsonb; v_brand jsonb;
+begin
+  select * into pk from public.training_packages where id = p_package;
+  if pk.id is null or pk.tenant_id is distinct from public.current_tenant_id()
+     or not app.is_trainer(auth.uid()) then
+    raise exception 'get_package_preview: trainer/QA only'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'position', s.position,
+           'title', s.title, 'body', s.body) order by s.position), '[]'::jsonb)
+    into v_slides from public.training_slides s where s.package_id = pk.id;
+  select jsonb_build_object('number', d.document_number, 'title', d.title,
+           'revision', v.revision_number, 'version_id', v.id)
+    into v_doc from public.documents d
+    join public.document_versions v on v.id = pk.document_version_id
+    where d.id = pk.document_id;
+  select jsonb_build_object('name', coalesce(b.org_display_name, o.name), 'logo', b.logo_ref,
+           'color_primary', b.color_primary, 'color_secondary', b.color_secondary, 'color_accent', b.color_accent)
+    into v_brand from public.organizations o
+    left join public.tenant_branding b on b.tenant_id = o.tenant_id
+    where o.id = pk.org_id;
+  return jsonb_build_object(
+    'assignment_id', null, 'status', 'preview', 'progress_pct', 0, 'due_at', null,
+    'template', pk.template_key, 'pass_mark', app.training_pass_mark(pk.tenant_id, pk.id),
+    'document', v_doc, 'branding', coalesce(v_brand, '{}'::jsonb), 'slides', v_slides,
+    'question_count', (select count(*) from public.training_questions where package_id = pk.id));
+end; $$;
 
 -- Slide progress: monotonic (resume support §5); 100% opens the assessment.
 create or replace function public.save_training_progress(p_assignment uuid, p_pct int)
@@ -893,6 +996,31 @@ begin
     'certificate_uid', v_cert_uid);
 end; $$;
 
+-- Seam event (plan §2): when a trained version is superseded/retained/destroyed,
+-- its open package closes itself — assignments stop counting anywhere, completed
+-- history and certificates stay untouched. Enrichment/cleanup only; gates nothing.
+create or replace function app.autoclose_training_packages() returns trigger
+language plpgsql security definer set search_path = app, public as $$
+declare pk record;
+begin
+  if new.status in ('superseded','retained','destroyed') and old.status <> new.status then
+    for pk in select id, tenant_id, org_id, department_id from public.training_packages
+              where document_version_id = new.id and state <> 'closed' loop
+      update public.training_packages
+        set state = 'closed', closed_at = now(),
+            close_reason = 'version ' || new.status || ' (auto-closed by the effective-window seam)'
+        where id = pk.id;
+      perform app.write_audit('training.package_autoclosed', null, null, pk.tenant_id, pk.org_id, pk.department_id,
+        'training_package', pk.id::text, null,
+        jsonb_build_object('version', new.id, 'version_status', new.status), null, 'seam-event');
+    end loop;
+  end if;
+  return new;
+end; $$;
+drop trigger if exists training_package_autoclose on public.document_versions;
+create trigger training_package_autoclose after update of status on public.document_versions
+  for each row execute function app.autoclose_training_packages();
+
 -- Training normally completes BEFORE release, and the core allocates the
 -- revision number only at effective time — so certificates issued at the gate
 -- snapshot a null revision. Backfill it the moment the trained version goes
@@ -935,6 +1063,7 @@ returns jsonb language sql stable security definer set search_path = app, public
       'overdue', a.status <> 'completed' and a.due_at is not null and a.due_at < now(),
       'document_number', d.document_number, 'document_title', d.title,
       'revision', v.revision_number, 'package_id', a.package_id,
+      'package_closed', p.state = 'closed',
       'certificate_uid', c.certificate_uid, 'score', c.score)
     order by a.assigned_at desc), '[]'::jsonb)
   from public.training_assignments a
@@ -1011,7 +1140,7 @@ returns boolean language sql stable security definer set search_path = app, publ
     select 1 from public.training_assignments a
     join public.training_packages p on p.id = a.package_id
     where a.user_id = p_user and a.status = 'completed'
-      and p.document_version_id = p_version and p.state <> 'closed')
+      and p.document_version_id = p_version)   -- completion is history; a later package close never revokes it
   or (not exists (select 1 from public.training_packages
                   where document_version_id = p_version and state <> 'closed')
       and exists (
@@ -1106,14 +1235,15 @@ do $$
 declare fn text;
 begin
   foreach fn in array array[
-    'create_training_package(uuid,text,int,int)','store_ai_draft(uuid,jsonb,jsonb,text,text,text)',
-    'log_ai_failure(uuid,text,text,text)','log_ai_call(uuid,text,text,text,text)',
-    'update_training_slide(uuid,text,text)','add_training_slide(uuid,text,text)',
+    'create_training_package(uuid,text,int,int)','store_ai_draft(uuid,jsonb,jsonb,text,text,text,jsonb)',
+    'log_ai_failure(uuid,text,text,text)','log_ai_call(uuid,text,text,text,text,jsonb)',
+    'ai_usage_guard()','ai_usage_summary(int)',
+    'update_training_slide(uuid,text,text)','add_training_slide(uuid,text,text,int)',
     'delete_training_slide(uuid)','reorder_training_slides(uuid,uuid[])',
-    'update_training_question(uuid,text,jsonb,int,text)','add_training_question(uuid,text,jsonb,int,text)',
+    'update_training_question(uuid,text,jsonb,int,text)','add_training_question(uuid,text,jsonb,int,text,int)',
     'delete_training_question(uuid)','reorder_training_questions(uuid,uuid[])',
     'approve_training_package(uuid)','close_training_package(uuid,text)',
-    'assign_training_package(uuid,uuid[],timestamptz)',
+    'assign_training_package(uuid,uuid[],timestamptz,uuid,text)','get_package_preview(uuid)',
     'get_training_content(uuid)','save_training_progress(uuid,int)',
     'get_assessment(uuid)','submit_assessment(uuid,jsonb)',
     'verify_certificate(text)','my_training()','my_training_status(uuid)',

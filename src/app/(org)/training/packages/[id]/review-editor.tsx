@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Plus, Sparkles, Trash2, X, Check, Loader2 } from "lucide-react";
+import { ArrowDownToLine, GripVertical, Pencil, Plus, Sparkles, Trash2, X, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   addQuestion,
   addSlide,
+  completeQuestionOptions,
   deleteQuestion,
   deleteSlide,
   regenerateQuestion,
@@ -142,14 +143,15 @@ export function SlideList({
     });
   }
 
-  function add() {
+  function add(position?: number) {
     startTransition(async () => {
       const fd = new FormData();
       fd.set("package_id", packageId);
       fd.set("title", "New slide");
+      if (position != null) fd.set("position", String(position));
       const res = await addSlide(fd);
       if (!res.ok) toast.error(res.error);
-      // Server assigns id/position — simplest correct refresh:
+      // Server assigns id and auto-renumbers — refresh for the true order:
       else window.location.reload();
     });
   }
@@ -210,6 +212,10 @@ export function SlideList({
                           onClick={() => setEditing(slide.id)}>
                           <Pencil className="size-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" aria-label={`Insert a slide after ${i + 1}`}
+                          onClick={() => add(i + 2)} disabled={pending}>
+                          <ArrowDownToLine className="size-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" aria-label={`Delete slide ${i + 1}`}
                           onClick={() => remove(slide)} disabled={pending}>
                           <Trash2 className="size-4" />
@@ -224,7 +230,7 @@ export function SlideList({
         </SortableContext>
       </DndContext>
       {editable && (
-        <Button variant="outline" size="sm" onClick={add} disabled={pending}>
+        <Button variant="outline" size="sm" onClick={() => add()} disabled={pending}>
           <Plus /> Add slide
         </Button>
       )}
@@ -321,10 +327,11 @@ export function QuestionList({
     });
   }
 
-  function add() {
+  function add(position?: number) {
     startTransition(async () => {
       const fd = new FormData();
       fd.set("package_id", packageId);
+      if (position != null) fd.set("position", String(position));
       const res = await addQuestion(fd);
       if (!res.ok) toast.error(res.error);
       else window.location.reload();
@@ -396,6 +403,10 @@ export function QuestionList({
                           onClick={() => regenerate(q)} disabled={pending}>
                           <Sparkles className="size-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" aria-label={`Insert a question after ${i + 1}`}
+                          onClick={() => add(i + 2)} disabled={pending}>
+                          <ArrowDownToLine className="size-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" aria-label={`Delete question ${i + 1}`}
                           onClick={() => remove(q)} disabled={pending}>
                           <Trash2 className="size-4" />
@@ -410,7 +421,7 @@ export function QuestionList({
         </SortableContext>
       </DndContext>
       {editable && (
-        <Button variant="outline" size="sm" onClick={add} disabled={pending}>
+        <Button variant="outline" size="sm" onClick={() => add()} disabled={pending}>
           <Plus /> Add question
         </Button>
       )}
@@ -435,7 +446,24 @@ function QuestionEditForm({
   const [options, setOptions] = useState<string[]>(question.options);
   const [correct, setCorrect] = useState(question.correct_index);
   const [explanation, setExplanation] = useState(question.explanation ?? "");
+  const [completing, setCompleting] = useState(false);
   const [, startTransition] = useTransition();
+
+  // AI-complete (human gate stands: nothing persists until Save).
+  function aiComplete() {
+    setCompleting(true);
+    startTransition(async () => {
+      const res = await completeQuestionOptions(packageId, text);
+      setCompleting(false);
+      if (!res.ok) return void toast.error(res.error);
+      const q = res.question as { question: string; options: string[]; correct_index: number; explanation?: string };
+      setText(q.question);
+      setOptions(q.options);
+      setCorrect(q.correct_index);
+      setExplanation(q.explanation ?? "");
+      toast.success("Options drafted from the document — review, adjust, then save.");
+    });
+  }
 
   function save() {
     startTransition(async () => {
@@ -482,6 +510,11 @@ function QuestionEditForm({
             <Plus /> Option
           </Button>
         )}
+        <Button variant="outline" size="sm" onClick={aiComplete}
+          disabled={completing || text.trim().length < 8}>
+          {completing ? <Loader2 className="animate-spin" /> : <Sparkles />}
+          Complete options with AI
+        </Button>
       </div>
       <div className="space-y-1">
         <Label htmlFor={`why-${question.id}`} className="text-xs">Explanation (shown after the attempt)</Label>
