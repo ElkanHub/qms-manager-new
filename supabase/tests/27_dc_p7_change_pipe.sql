@@ -23,6 +23,12 @@ insert into public.user_roles(user_id, tenant_id, role, department_id) values
   ('33330000-0000-0000-0000-000000000005',(select tenant_id from t),'signatory',null),
   ('33330000-0000-0000-0000-000000000006',(select tenant_id from t),'org_admin',null);
 
+-- signing v2: signers must have a signature on file (onboarding collects it)
+insert into public.user_signatures(user_id, tenant_id, image_data, source)
+  select u.id, u.tenant_id, 'data:image/png;base64,' || repeat('iVBORw0KGgoAAAANSUhEUg', 20), 'drawn'
+  from public.users u where u.tenant_id = (select tenant_id from t)
+  on conflict (user_id) do nothing;
+
 create or replace function pg_temp.as_user(p uuid) returns void language sql as $$
   select set_config('request.jwt.claims',
     json_build_object('sub', p, 'app_metadata', json_build_object('tenant_id',(select tenant_id from t)))::text, true);

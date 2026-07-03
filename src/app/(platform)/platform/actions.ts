@@ -94,6 +94,7 @@ export async function setOnboardingFlow(formData: FormData): Promise<Result> {
   const { error } = await supabase.rpc("set_onboarding_flow", {
     p_tenant: String(formData.get("tenant_id")),
     p_steps: steps,
+    p_audience: String(formData.get("audience") || "member"),
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/platform/onboarding");

@@ -108,7 +108,11 @@ export async function reviewDocument(formData: FormData): Promise<Result> {
 export async function applySignature(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const id = String(formData.get("cc"));
-  const { error } = await supabase.rpc("apply_signature", { p_cc: id, p_meaning: String(formData.get("meaning")) });
+  const { error } = await supabase.rpc("apply_signature", {
+    p_cc: id,
+    p_meaning: String(formData.get("meaning")),
+    p_kind: String(formData.get("signature_kind") || "drawn"),
+  });
   if (error) return { ok: false, error: error.message };
   rev(id);
   return { ok: true, message: "Signed." };
