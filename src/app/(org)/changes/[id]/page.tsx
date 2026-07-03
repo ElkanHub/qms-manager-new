@@ -67,15 +67,18 @@ export default async function ChangeWorkstation({ params }: { params: Promise<{ 
   const { data: sigs } = await supabase
     .from("signatures").select("role_key, signatory_id, signed_at, waived, waiver_reason").eq("change_control_id", id);
 
-  // The reconciliation gate's worklist: exactly the copies reconcile_cc counts.
+  // The reconciliation worklist: every issued copy of the outgoing versions,
+  // with only controlled/display marked blocking (uncontrolled never blocks).
   const { data: outstandingCopies } =
     cc.status === "pending_reconciliation"
       ? await supabase.rpc("outstanding_copies_for_cc", { p_cc: id })
       : { data: null };
-  const outstanding = (outstandingCopies ?? []) as {
+  const allCopies = (outstandingCopies ?? []) as {
     copy_id: string; copy_number: number; holder: string; purpose: string | null;
-    document_number: string | null; title: string;
+    copy_type: string; blocking: boolean; document_number: string | null; title: string;
   }[];
+  const outstanding = allCopies.filter((c) => c.blocking);
+  const staleInfo = allCopies.filter((c) => !c.blocking);
 
   const s = cc.status;
   const at = STAGE_AT[s] ?? 0;
@@ -266,7 +269,7 @@ export default async function ChangeWorkstation({ params }: { params: Promise<{ 
 
       {/* D-RECONCILE */}
       {isQA && s === "pending_reconciliation" && (
-        <SectionCard title="Reconciliation" description="Confirms every issued controlled copy of the outgoing versions is accounted for. Trivially satisfied when the copy register module is off.">
+        <SectionCard title="Reconciliation" description="Confirms every controlled and display copy of the outgoing versions is accounted for (uncontrolled copies never block). Trivially satisfied when the copy register module is off.">
           {outstanding.length > 0 ? (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription>
@@ -289,6 +292,13 @@ export default async function ChangeWorkstation({ params }: { params: Promise<{ 
           ) : (
             <p className="mb-4 text-sm text-muted-foreground">
               Nothing outstanding on the copy register for the affected documents.
+            </p>
+          )}
+          {staleInfo.length > 0 && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              {staleInfo.length} uncontrolled {staleInfo.length === 1 ? "copy" : "copies"} will go
+              stale with this change ({staleInfo.map((c) => c.holder).join(", ")}) — recorded on the
+              register, never blocking.
             </p>
           )}
           <ActionForm action={reconcile} submitLabel="Reconcile">

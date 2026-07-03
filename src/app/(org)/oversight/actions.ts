@@ -32,10 +32,48 @@ export async function issueCopy(formData: FormData): Promise<Result> {
     p_version: String(formData.get("version_id")),
     p_holder: String(formData.get("holder")),
     p_purpose: String(formData.get("purpose") || "") || null,
+    p_type: String(formData.get("copy_type") || "controlled"),
+    p_format: String(formData.get("format") || "paper"),
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/copies");
   return { ok: true, message: "Copy issued." };
+}
+
+export async function requestCopy(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("request_copy", {
+    p_document: String(formData.get("document_id")),
+    p_type: String(formData.get("copy_type")),
+    p_format: String(formData.get("format")),
+    p_destination: String(formData.get("destination")),
+    p_quantity: Number(formData.get("quantity") || 1),
+    p_purpose: String(formData.get("purpose")),
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/copies");
+  return { ok: true, message: "Request sent to QA." };
+}
+
+export async function issueCopyRequest(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("issue_copy_request", {
+    p_request: String(formData.get("request_id")),
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/copies");
+  return { ok: true, message: "Copies issued and on the register." };
+}
+
+export async function declineCopyRequest(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decline_copy_request", {
+    p_request: String(formData.get("request_id")),
+    p_reason: String(formData.get("reason") || ""),
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/copies");
+  return { ok: true, message: "Request declined." };
 }
 
 export async function reconcileCopy(formData: FormData): Promise<Result> {
