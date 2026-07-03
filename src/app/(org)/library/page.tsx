@@ -98,7 +98,7 @@ export default async function Library({
         searchKey="document"
         searchPlaceholder="Search number or title…"
         facets={[{ columnId: "category", title: "Category" }]}
-        onRowHref={(r) => `/documents/${r.id}`}
+        rowHrefBase="/documents"
         emptyState={
           <EmptyState
             icon={Star}

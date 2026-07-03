@@ -35,8 +35,11 @@ export interface DataTableProps<TData, TValue> {
   /** Faceted filters (status, department, category…). */
   facets?: FacetConfig[];
   initialSort?: SortingState;
-  /** Whole-row link; returns an href for a row or null for non-linking rows. */
+  /** Whole-row link; returns an href for a row or null for non-linking rows.
+      CLIENT callers only — functions cannot cross the server→client boundary. */
   onRowHref?: (row: TData) => string | null;
+  /** Whole-row link for SERVER callers (serializable): href = `${rowHrefBase}/${row.id}`. */
+  rowHrefBase?: string;
   /** Rendered when there are no rows at all. */
   emptyState?: React.ReactNode;
   /** Right-aligned primary action in the toolbar. */
@@ -52,11 +55,23 @@ export function DataTable<TData, TValue>({
   facets,
   initialSort = [],
   onRowHref,
+  rowHrefBase,
   emptyState,
   toolbarAction,
   pageSize = 25,
 }: DataTableProps<TData, TValue>) {
   const router = useRouter();
+  const rowHref = React.useMemo(
+    () =>
+      onRowHref ??
+      (rowHrefBase
+        ? (row: TData) => {
+            const id = (row as { id?: string }).id;
+            return id ? `${rowHrefBase}/${id}` : null;
+          }
+        : undefined),
+    [onRowHref, rowHrefBase],
+  );
   const [sorting, setSorting] = React.useState<SortingState>(initialSort);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -117,14 +132,14 @@ export function DataTable<TData, TValue>({
                       : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
-                {onRowHref && <TableHead className="w-8" />}
+                {rowHref && <TableHead className="w-8" />}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
             {rows.length ? (
               rows.map((row) => {
-                const href = onRowHref?.(row.original);
+                const href = rowHref?.(row.original);
                 return (
                   <TableRow
                     key={row.id}
@@ -136,7 +151,7 @@ export function DataTable<TData, TValue>({
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
-                    {onRowHref && (
+                    {rowHref && (
                       <TableCell className="w-8 py-2.5">
                         {href && (
                           // The row's real anchor (§9): keyboard-focusable,
@@ -159,7 +174,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length + (onRowHref ? 1 : 0)}
+                  colSpan={columns.length + (rowHref ? 1 : 0)}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No results for the current filter.

@@ -46,7 +46,7 @@ export default async function MasterIndex() {
         searchKey="document"
         searchPlaceholder="Search number or title…"
         facets={[{ columnId: "department", title: "Department" }]}
-        onRowHref={(r) => `/documents/${r.id}`}
+        rowHrefBase="/documents"
         emptyState={
           <EmptyState
             icon={FileText}
