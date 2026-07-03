@@ -17,15 +17,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { issueCopy } from "@/app/(org)/oversight/actions";
+import { CopyTypePicker } from "./request-copy-dialog";
 
-// Issue a controlled copy against a document's effective version (calls issueCopy).
-// Options = documents with an effective current version only.
+// QA's direct issue — request and issuance in one act (QA is both requester and
+// release authority). Same register entry, same stamps, same audit as the queue.
 export function IssueCopyDialog({
   options,
+  formats,
+  allowUncontrolled,
 }: {
   options: { versionId: string; label: string }[];
+  formats: string[];
+  allowUncontrolled: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [copyType, setCopyType] = useState("controlled");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -51,12 +57,13 @@ export function IssueCopyDialog({
           Issue copy
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <form action={onSubmit} className="space-y-4">
           <DialogHeader>
             <DialogTitle>Issue controlled copy</DialogTitle>
             <DialogDescription>
-              Register a physical/controlled distribution against a document&apos;s effective version.
+              Direct issue against a document&apos;s effective version — lands on the register
+              exactly like a fulfilled request.
             </DialogDescription>
           </DialogHeader>
 
@@ -77,7 +84,32 @@ export function IssueCopyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="holder">Holder</Label>
+            <Label>Copy type</Label>
+            <CopyTypePicker
+              name="copy_type"
+              value={copyType}
+              onChange={setCopyType}
+              allowUncontrolled={allowUncontrolled}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="format">Format</Label>
+            <select
+              id="format"
+              name="format"
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {formats.map((f) => (
+                <option key={f} value={f}>
+                  {f === "paper" ? "Paper" : "PDF"}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="holder">Holder / destination</Label>
             <Input
               id="holder"
               name="holder"
@@ -88,11 +120,7 @@ export function IssueCopyDialog({
 
           <div className="space-y-2">
             <Label htmlFor="purpose">Purpose (optional)</Label>
-            <Input
-              id="purpose"
-              name="purpose"
-              placeholder="Why this copy is being distributed"
-            />
+            <Input id="purpose" name="purpose" placeholder="Why this copy is being distributed" />
           </div>
 
           {error && (

@@ -2,9 +2,8 @@
 
 import { useState, useTransition } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Loader2 } from "lucide-react";
+import { FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { StatusBadge } from "@/components/app/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -25,14 +24,30 @@ export type CopyRow = {
   id: string;
   copyNumber: string;
   document: string;
+  copyType: string;
+  format: string;
   holder: string;
   purpose: string | null;
   issuedDate: string;
-  status: string;
-  method: string | null;
+  liveState: string;
   note: string | null;
-  recallDue: boolean;
   canReconcile: boolean;
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  controlled: "Controlled",
+  display: "Display",
+  uncontrolled: "Uncontrolled",
+};
+
+// The register's derived state → what the reader should feel about it.
+const STATE_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  issued: { label: "Issued", variant: "default" },
+  superseded_unreconciled: { label: "Recall due", variant: "destructive" },
+  stale_uncontrolled: { label: "May be stale", variant: "secondary" },
+  returned: { label: "Returned", variant: "outline" },
+  destroyed: { label: "Destroyed", variant: "outline" },
+  lost: { label: "Lost", variant: "outline" },
 };
 
 // Reconcile dialog: method from the register vocabulary; "lost" demands a
@@ -121,9 +136,8 @@ function ReconcileDialog({ copyId }: { copyId: string }) {
   );
 }
 
-// Controlled-copy register columns (UI_BUILD_PLAN §7.8): identity = copy # mono,
-// then document/version, holder, purpose, issued date, status (with a recall-due
-// flag when the underlying version is no longer effective), and reconcile.
+// The register (C-REGISTER): identity = copy # mono, then document, type,
+// holder, issued date, derived state, the stamped issue sheet, and reconcile.
 export const columns: ColumnDef<CopyRow>[] = [
   {
     accessorKey: "copyNumber",
@@ -132,18 +146,32 @@ export const columns: ColumnDef<CopyRow>[] = [
   },
   {
     accessorKey: "document",
-    header: "Document / version",
+    header: "Document",
     cell: ({ row }) => <span className="font-medium">{row.original.document}</span>,
   },
   {
-    accessorKey: "holder",
-    header: "Holder",
+    accessorKey: "copyType",
+    header: "Type",
+    cell: ({ row }) => (
+      <span className="text-sm">
+        {TYPE_LABEL[row.original.copyType] ?? row.original.copyType}
+        <span className="ml-1 text-xs text-muted-foreground">
+          {row.original.format === "pdf" ? "· PDF" : "· paper"}
+        </span>
+      </span>
+    ),
+    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
   {
-    accessorKey: "purpose",
-    header: "Purpose",
+    accessorKey: "holder",
+    header: "Holder / destination",
     cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">{row.original.purpose ?? "—"}</span>
+      <span className="text-sm">
+        {row.original.holder}
+        {row.original.purpose && (
+          <span className="block text-xs text-muted-foreground">{row.original.purpose}</span>
+        )}
+      </span>
     ),
   },
   {
@@ -152,25 +180,38 @@ export const columns: ColumnDef<CopyRow>[] = [
     cell: ({ row }) => <span className="tabular-nums">{row.original.issuedDate}</span>,
   },
   {
-    accessorKey: "status",
+    accessorKey: "liveState",
     header: "Status",
-    cell: ({ row }) => (
-      <span className="flex items-center gap-2">
-        <StatusBadge value={row.original.status} kind="version" dot />
-        {row.original.recallDue && <Badge variant="destructive">Recall due</Badge>}
-        {row.original.method && (
-          <span className="text-xs text-muted-foreground" title={row.original.note ?? undefined}>
-            {row.original.method}
-          </span>
-        )}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const badge = STATE_BADGE[row.original.liveState] ?? {
+        label: row.original.liveState,
+        variant: "outline" as const,
+      };
+      return (
+        <span className="flex items-center gap-2">
+          <Badge variant={badge.variant}>{badge.label}</Badge>
+          {row.original.note && (
+            <span className="max-w-[16ch] truncate text-xs text-muted-foreground" title={row.original.note}>
+              {row.original.note}
+            </span>
+          )}
+        </span>
+      );
+    },
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
   {
-    id: "reconcile",
+    id: "actions",
     header: "",
-    cell: ({ row }) =>
-      row.original.canReconcile ? <ReconcileDialog copyId={row.original.id} /> : null,
+    cell: ({ row }) => (
+      <span className="flex items-center justify-end gap-1">
+        <Button variant="ghost" size="icon" asChild aria-label="Issue sheet (PDF)">
+          <a href={`/copies/${row.original.id}/sheet`} target="_blank" rel="noreferrer">
+            <FileDown className="size-4" />
+          </a>
+        </Button>
+        {row.original.canReconcile && <ReconcileDialog copyId={row.original.id} />}
+      </span>
+    ),
   },
 ];

@@ -1,26 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 
 // The register export — in an inspection, this file IS the deliverable. One row
-// per controlled copy with full accountability: what was issued, to whom, why,
-// by whom, and how it was accounted for. RLS scopes rows to the viewer's tenant.
+// per copy that has ever left the system, with full accountability: what was
+// issued, which revision, what type, to whom, why, by whom, and how it was
+// accounted for. RLS scopes rows to the viewer's tenant.
 export async function GET() {
   const supabase = await createClient();
 
   const { data: copies } = await supabase
-    .from("controlled_copies")
+    .from("copies_register")
     .select(
-      "id, document_version_id, copy_number, holder, purpose, status, issued_by, issued_at, reconciled_by, reconciled_at, reconciled_method, reconciled_note",
+      "copy_number, document_number, title, revision_number, version_status, copy_type, format, holder, purpose, live_state, issued_by, issued_at, reconciled_method, reconciled_note, reconciled_by, reconciled_at",
     )
     .order("issued_at", { ascending: true });
 
-  const versionIds = [...new Set((copies ?? []).map((c) => c.document_version_id))];
-  const { data: versions } = versionIds.length
-    ? await supabase.from("document_versions").select("id, document_id, status, revision_number").in("id", versionIds)
-    : { data: [] as { id: string; document_id: string; status: string; revision_number: number | null }[] };
-  const docIds = [...new Set((versions ?? []).map((v) => v.document_id))];
-  const { data: docs } = docIds.length
-    ? await supabase.from("documents").select("id, title, document_number").in("id", docIds)
-    : { data: [] as { id: string; title: string; document_number: string | null }[] };
   const userIds = [
     ...new Set((copies ?? []).flatMap((c) => [c.issued_by, c.reconciled_by]).filter(Boolean)),
   ] as string[];
@@ -31,29 +24,30 @@ export async function GET() {
 
   const cols = [
     "copy_number", "document_number", "document_title", "revision", "version_status",
-    "holder", "purpose", "status", "issued_by", "issued_at",
+    "copy_type", "format", "holder", "purpose", "state", "issued_by", "issued_at",
     "reconciled_method", "reconciled_note", "reconciled_by", "reconciled_at",
   ];
-  const rows = (copies ?? []).map((c) => {
-    const v = versions?.find((x) => x.id === c.document_version_id);
-    const d = docs?.find((x) => x.id === v?.document_id);
-    return {
-      copy_number: c.copy_number,
-      document_number: d?.document_number ?? "",
-      document_title: d?.title ?? "",
-      revision: v?.revision_number ?? "",
-      version_status: v?.status ?? "",
-      holder: c.holder,
-      purpose: c.purpose ?? "",
-      status: c.status,
-      issued_by: emailOf(c.issued_by),
-      issued_at: c.issued_at ?? "",
-      reconciled_method: c.reconciled_method ?? "",
-      reconciled_note: c.reconciled_note ?? "",
-      reconciled_by: emailOf(c.reconciled_by),
-      reconciled_at: c.reconciled_at ?? "",
-    } as Record<string, unknown>;
-  });
+  const rows = (copies ?? []).map(
+    (c) =>
+      ({
+        copy_number: c.copy_number,
+        document_number: c.document_number ?? "",
+        document_title: c.title ?? "",
+        revision: c.revision_number ?? "",
+        version_status: c.version_status ?? "",
+        copy_type: c.copy_type,
+        format: c.format,
+        holder: c.holder,
+        purpose: c.purpose ?? "",
+        state: c.live_state,
+        issued_by: emailOf(c.issued_by),
+        issued_at: c.issued_at ?? "",
+        reconciled_method: c.reconciled_method ?? "",
+        reconciled_note: c.reconciled_note ?? "",
+        reconciled_by: emailOf(c.reconciled_by),
+        reconciled_at: c.reconciled_at ?? "",
+      }) as Record<string, unknown>,
+  );
 
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");
@@ -61,7 +55,7 @@ export async function GET() {
   return new Response(csv, {
     headers: {
       "content-type": "text/csv",
-      "content-disposition": 'attachment; filename="controlled-copy-register.csv"',
+      "content-disposition": 'attachment; filename="copy-register.csv"',
     },
   });
 }

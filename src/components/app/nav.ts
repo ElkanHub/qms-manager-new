@@ -73,7 +73,7 @@ export const orgNav: NavGroup[] = [
       { label: "Retirements", href: "/queues/retirements", icon: Archive, roles: ["qa"], badge: "retirements" },
       { label: "Destruction", href: "/queues/destruction", icon: Flame, roles: ["qa"], badge: "destruction" },
       { label: "Periodic review", href: "/periodic", icon: CalendarClock, roles: ["qa"], badge: "periodic" },
-      { label: "Controlled copies", href: "/copies", icon: Copy, roles: ["qa"] },
+      { label: "Copies", href: "/copies", icon: Copy },
     ],
   },
   {
@@ -134,7 +134,7 @@ export const routeLabels: Record<string, string> = {
   "/queues/retirements": "Retirements",
   "/queues/destruction": "Destruction",
   "/periodic": "Periodic review",
-  "/copies": "Controlled copies",
+  "/copies": "Copies",
   "/training": "My training",
   "/training/packages": "Training packages",
   "/training/dashboard": "Training dashboard",
