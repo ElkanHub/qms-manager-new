@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SignOutButton } from "./SignOutButton";
+import { SoundToggle } from "./sound-toggle";
 
 // S-ACCOUNT — a user's own minimal account view + MFA/device management.
 // No self-service role changes (roles are granted by QA, Phase 4).
@@ -14,11 +15,10 @@ export default async function Account() {
   const user = await requireUser();
   const roles = await getMyRoles();
   const supabase = await createClient();
-  const { data: mySig } = await supabase
-    .from("user_signatures")
-    .select("image_data")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [{ data: mySig }, { data: prefs }] = await Promise.all([
+    supabase.from("user_signatures").select("image_data").eq("user_id", user.id).maybeSingle(),
+    supabase.from("user_prefs").select("sound_enabled").eq("user_id", user.id).maybeSingle(),
+  ]);
 
   const name = user.full_name ?? user.email;
   const initials = (user.full_name ?? user.email)
@@ -70,6 +70,10 @@ export default async function Account() {
             Theme follows your system preference by default — switch it any time from the
             toggle in the top bar.
           </p>
+
+          <Separator />
+
+          <SoundToggle initial={prefs?.sound_enabled ?? true} />
 
           <Separator />
 
