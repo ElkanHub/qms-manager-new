@@ -5,6 +5,7 @@ import { getQueueCounts } from "@/lib/queue-counts";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { AppHeader } from "@/components/app/app-header";
+import { PulseSidebar } from "@/components/app/pulse-sidebar";
 
 // Org shell (UI_BUILD_PLAN §4.1). Guards the whole tenant-facing surface, then
 // wraps every org page in the collapsible sidebar + sticky header. Role list is
@@ -21,11 +22,15 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
 
   // Documents are no longer preloaded here — the ⌘K palette searches
   // server-side and breadcrumbs resolve labels with a single cached lookup.
-  const [{ data: org }, { data: mods }] = await Promise.all([
+  const [{ data: org }, { data: mods }, { data: prefs }, { data: departments }] = await Promise.all([
     supabase.from("organizations").select("name").eq("tenant_id", user.tenant_id).maybeSingle(),
     supabase.from("tenant_modules").select("module_key, enabled"),
+    supabase.from("user_prefs").select("sound_enabled").eq("user_id", user.id).maybeSingle(),
+    supabase.from("departments").select("id, name").order("name"),
   ]);
   const moduleStates = Object.fromEntries((mods ?? []).map((m) => [m.module_key, m.enabled]));
+  const isQaOrAdmin = roles.includes("qa") || roles.includes("org_admin");
+  const canBroadcast = isQaOrAdmin || roles.includes("hod");
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
@@ -42,6 +47,18 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
             until pages are rebuilt onto PageHeader (§7). */}
         <div className="flex-1">{children}</div>
       </SidebarInset>
+      <PulseSidebar
+        modules={{
+          pulse: moduleStates["pulse"] === true,
+          broadcasts: moduleStates["broadcasts"] === true,
+          messages: moduleStates["messages"] === true,
+        }}
+        soundEnabled={prefs?.sound_enabled ?? true}
+        canBroadcast={canBroadcast}
+        departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
+        myDepartmentId={user.department_id ?? null}
+        isQaOrAdmin={isQaOrAdmin}
+      />
     </SidebarProvider>
   );
 }
