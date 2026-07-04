@@ -5,7 +5,7 @@ plugs into. Built strictly from `FOUNDATIONS.md` and `FOUNDATION_BUILD_PLAN.md`,
 phase by phase. This repo is the **foundation only** — no document-control state
 machine yet (that's the next plan).
 
-## Stack
+## Stack.
 
 - **Next.js 15** (App Router, TypeScript) — the app + screens.
 - **Supabase / Postgres** — data, RLS isolation, auth (Google SSO + MFA), RPCs.
