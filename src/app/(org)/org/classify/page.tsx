@@ -6,7 +6,8 @@ import { SectionCard } from "@/components/app/section-card";
 import { MatrixGrid } from "./matrix-grid";
 
 const CLASSES = ["minor", "major", "critical"] as const;
-const ROLES = ["qa", "hod", "signatory", "approver", "trainer"] as const;
+// 'approver' is retired — approval authority is QA-department membership ('qa').
+const ROLES = ["qa", "hod", "signatory", "trainer"] as const;
 const DEFAULTS: Record<string, string[]> = {
   minor: ["qa"],
   major: ["qa", "hod"],

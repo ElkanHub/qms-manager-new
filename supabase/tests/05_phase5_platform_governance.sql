@@ -115,7 +115,7 @@ select set_config('request.jwt.claims', json_build_object('sub','cccccccc-0000-0
   'app_metadata', json_build_object('platform_role','admin'))::text, true);
 set local role authenticated;
 select assert_raises(
-  $$select public.grant_role('cccccccc-0000-0000-0000-000000000003','viewer')$$,
+  $$select public.grant_role('cccccccc-0000-0000-0000-000000000003','trainer')$$,
   'a platform role cannot grant org roles (not an org user)');
 reset role;
 select set_config('request.jwt.claims', null, true);

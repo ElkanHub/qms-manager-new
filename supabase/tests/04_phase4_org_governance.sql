@@ -31,7 +31,7 @@ select set_config('request.jwt.claims', json_build_object(
 set local role authenticated;
 select public.create_department('Ops X');
 select public.create_department('Ops Y');
-select public.grant_role('bbbbbbbb-0000-0000-0000-000000000003','author',
+select public.grant_role('bbbbbbbb-0000-0000-0000-000000000003','trainer',
   (select id from departments where name='Ops X'));
 select public.assign_hod('bbbbbbbb-0000-0000-0000-000000000003',
   (select id from departments where name='Ops X'));
@@ -59,13 +59,12 @@ select assert_raises($$select public.grant_role('bbbbbbbb-0000-0000-0000-0000000
 select assert_raises($$select public.grant_role('bbbbbbbb-0000-0000-0000-000000000003','signatory')$$,
   'Org-Admin must be refused granting Signatory');
 -- But Org-Admin CAN grant a non-critical role (delegated user-provisioning).
-select public.grant_role('bbbbbbbb-0000-0000-0000-000000000003','viewer',
-  (select id from departments where name='Ops X'));
+select public.grant_role('bbbbbbbb-0000-0000-0000-000000000003','org_admin');
 reset role;
 select set_config('request.jwt.claims', null, true);
 
-select assert(app.has_role('bbbbbbbb-0000-0000-0000-000000000003','viewer',
-  (select id from departments where name='Ops X')), 'Org-Admin granted a non-critical role');
+select assert(app.has_role('bbbbbbbb-0000-0000-0000-000000000003','org_admin'),
+  'Org-Admin granted a non-critical role');
 
 -- === Segregation-of-duties primitive (action-level, actor vs record owner) ===
 select assert(not app.sod_ok('bbbbbbbb-0000-0000-0000-000000000003',
