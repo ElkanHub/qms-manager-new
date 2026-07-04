@@ -34,8 +34,14 @@ export default async function Switchboard() {
     document_control: "Document control",
     ai: "AI services",
     quality: "Quality processes",
+    collaboration: "Collaboration",
   };
-  const CATEGORY_ORDER = ["document_control", "ai", "quality"];
+  const CATEGORY_ORDER = ["document_control", "ai", "quality", "collaboration"];
+  // Safety net: any future category renders at the end instead of vanishing.
+  const extraCategories = [...new Set((modules ?? []).map((m) => m.category))].filter(
+    (c) => !CATEGORY_ORDER.includes(c),
+  );
+  const allCategories = [...CATEGORY_ORDER, ...extraCategories];
   const byCategory = (cat: string) => (modules ?? []).filter((m) => m.category === cat);
 
   return (
@@ -50,7 +56,7 @@ export default async function Switchboard() {
       ) : (
         (tenants ?? []).map((t) => (
           <SectionCard key={t.id} title={t.name} contentClassName="space-y-5">
-            {CATEGORY_ORDER.map((cat) => {
+            {allCategories.map((cat) => {
               const mods = byCategory(cat);
               if (mods.length === 0) return null;
               return (
