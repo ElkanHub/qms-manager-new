@@ -13,37 +13,38 @@ import { Mail } from "lucide-react";
 import { inviteUser } from "../actions";
 import { DepartmentSelect } from "./department-select";
 
-const QUALITY_CRITICAL = new Set(["qa", "approver", "signatory"]);
+// The assignable primary roles — the employee baseline plus the two positions.
+// Capabilities (signatory, trainer) and QA membership are managed per person on
+// Users & roles after the invitee joins.
+const PRIMARY_ROLES = [
+  { key: "employee", label: "Employee", hint: "The baseline — views effective documents and can author." },
+  { key: "hod", label: "HOD / Manager", hint: "Departmental head; endorses their unit's work." },
+  { key: "org_admin", label: "Org-Admin", hint: "Manages users and org settings." },
+];
 
-// Short helper descriptions per role (the roles table carries no description column).
-const ROLE_HINT: Record<string, string> = {
-  author: "Drafts and revises documents.",
-  hod: "Head of department; endorses their unit's work.",
-  qa: "Quality authority; approves and provisions.",
-  approver: "Signs off on document approval.",
-  signatory: "Signs controlled documents.",
-  trainer: "Assigns and tracks training.",
-  org_admin: "Manages users and org settings.",
-  viewer: "Read-only access to effective documents.",
-};
-
-// S-INVITE — invite composer (email + intended department/role) plus the tenant's
-// recent invitations. Quality-critical roles only appear for QA; the server enforces
-// the same boundary. All authority/queries are preserved from the original screen.
+// S-INVITE — invite composer (email + department + primary role) plus the
+// tenant's recent invitations. Inviting into the QA department is QA-only
+// (membership confers approval authority); the server enforces the boundary.
 export default async function Invite() {
   await requireOrgUser();
   const isQA = (await getMyRoles()).includes("qa");
   const supabase = await createClient();
   const [{ data: roles }, { data: departments }, { data: invitations }] = await Promise.all([
-    supabase.from("roles").select("*").order("label"),
-    supabase.from("departments").select("id, name").order("name"),
+    supabase.from("roles").select("key, label"),
+    supabase.from("departments").select("id, name, is_default").order("name"),
     supabase
       .from("invitations")
       .select("id, email, initial_role, status, expires_at")
       .order("created_at", { ascending: false }),
   ]);
-  const invitable = (roles ?? []).filter((r) => isQA || !QUALITY_CRITICAL.has(r.key));
-  const labelOf = (key: string) => (roles ?? []).find((r) => r.key === key)?.label ?? key;
+  // Non-QA inviters never see the QA department — its membership is QA-granted.
+  const invitableDepts = (departments ?? [])
+    .filter((d) => isQA || !d.is_default)
+    .map((d) => ({ id: d.id, name: d.is_default ? `${d.name} — confers approval authority` : d.name }));
+  const labelOf = (key: string) =>
+    PRIMARY_ROLES.find((r) => r.key === key)?.label ??
+    (roles ?? []).find((r) => r.key === key)?.label ??
+    key;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-2">
@@ -60,29 +61,31 @@ export default async function Invite() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Initial role</Label>
-            <Select name="role" defaultValue={invitable[0]?.key} required>
+            <Label htmlFor="role">Primary role</Label>
+            <Select name="role" defaultValue="employee" required>
               <SelectTrigger id="role">
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                {invitable.map((r) => (
+                {PRIMARY_ROLES.map((r) => (
                   <SelectItem key={r.key} value={r.key}>
                     <span className="flex flex-col">
                       <span>{r.label}</span>
-                      {ROLE_HINT[r.key] && (
-                        <span className="text-xs text-muted-foreground">{ROLE_HINT[r.key]}</span>
-                      )}
+                      <span className="text-xs text-muted-foreground">{r.hint}</span>
                     </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Capabilities (signatory, trainer) default from the role and are adjusted per person on
+              Users &amp; roles. Approval authority comes only from QA-department membership.
+            </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="department_id">Department</Label>
-            <DepartmentSelect departments={departments ?? []} />
+            <DepartmentSelect departments={invitableDepts} />
           </div>
         </ActionForm>
       </SectionCard>

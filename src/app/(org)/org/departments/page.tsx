@@ -58,7 +58,11 @@ export default async function Departments() {
                   <TableCell className="py-2.5">
                     <span className="flex items-center gap-2 font-medium">
                       {d.name}
-                      {d.is_default && <Badge variant="outline">org root</Badge>}
+                      {d.is_default && (
+                        <Badge variant="outline" title="Membership in the root QA department confers approval/release authority">
+                          QA root · approval authority
+                        </Badge>
+                      )}
                     </span>
                   </TableCell>
                   <TableCell className="py-2.5">

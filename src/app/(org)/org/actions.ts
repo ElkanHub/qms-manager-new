@@ -28,13 +28,46 @@ export async function assignHod(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
-export async function grantRole(formData: FormData): Promise<Result> {
+// The three axes of the permission model, each its own audited RPC. The server
+// enforces every boundary (QA-department moves and signatory are QA-only;
+// primary roles and trainer are QA or Org-Admin); the dialog only reflects it.
+export async function setUserDepartment(userId: string, departmentId: string): Promise<Result> {
   const supabase = await createClient();
-  const dept = formData.get("department_id");
-  const { error } = await supabase.rpc("grant_role", {
-    p_target_user: String(formData.get("user_id")),
-    p_role: String(formData.get("role")),
-    p_department: dept ? String(dept) : null,
+  const { error } = await supabase.rpc("set_user_department", {
+    p_target_user: userId,
+    p_department: departmentId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/org/users");
+  return { ok: true };
+}
+
+export async function setPrimaryRole(
+  userId: string,
+  role: "employee" | "hod" | "org_admin",
+  departmentId: string | null,
+): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_primary_role", {
+    p_target_user: userId,
+    p_role: role,
+    p_department: departmentId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/org/users");
+  return { ok: true };
+}
+
+export async function setCapability(
+  userId: string,
+  capability: "signatory" | "trainer",
+  granted: boolean,
+): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_capability", {
+    p_target_user: userId,
+    p_capability: capability,
+    p_granted: granted,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/org/users");
