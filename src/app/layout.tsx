@@ -4,12 +4,22 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-// Self-hosted Inter (variable) — no build-time Google Fonts fetch, so builds never
-// fail on a flaky network. The font file lives in the repo under ./fonts.
-const inter = localFont({
-  src: "./fonts/inter-variable.woff2",
+// Self-hosted DM Sans / DM Mono (the SOP-Manager-V2 type pair) — no build-time
+// Google Fonts fetch, so builds never fail on a flaky network. The font files
+// live in the repo under ./fonts.
+const dmSans = localFont({
+  src: "./fonts/dm-sans-variable.woff2",
   variable: "--font-sans",
-  weight: "100 900",
+  weight: "400 700",
+  display: "swap",
+});
+
+const dmMono = localFont({
+  src: [
+    { path: "./fonts/dm-mono-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/dm-mono-500.woff2", weight: "500", style: "normal" },
+  ],
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -21,7 +31,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} min-h-screen font-sans antialiased`}>
+      <body className={`${dmSans.variable} ${dmMono.variable} min-h-screen font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -74,6 +74,26 @@ export async function setCapability(
   return { ok: true };
 }
 
+// QA designs the dashboard for an audience — base (departmentId null) or a
+// specific department. widgets null resets the scope back to its fallback.
+// QA-only, validated and audited server-side.
+export async function saveDashboardConfig(
+  audience: "admin" | "employee",
+  departmentId: string | null,
+  widgets: { key: string; size?: "full" | "half" }[] | null,
+): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_dashboard_config", {
+    p_audience: audience,
+    p_department: departmentId,
+    p_widgets: widgets,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/dashboard");
+  revalidatePath("/org/dashboards");
+  return { ok: true, message: widgets ? "Dashboard saved." : "Dashboard reset." };
+}
+
 export async function deactivateUser(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("org_deactivate_user", {

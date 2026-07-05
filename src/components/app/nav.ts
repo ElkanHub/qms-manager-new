@@ -90,6 +90,7 @@ export const orgNav: NavGroup[] = [
     label: "Administration",
     items: [
       { label: "Users & roles", href: "/org/users", icon: Users, roles: ["qa", "org_admin"] },
+      { label: "Dashboard design", href: "/org/dashboards", icon: LayoutDashboard, roles: ["qa"] },
       { label: "Departments", href: "/org/departments", icon: Building2, roles: ["qa", "org_admin"] },
       { label: "Invitations", href: "/org/invite", icon: Mail, roles: ["qa", "org_admin"] },
       { label: "Branding", href: "/org/branding", icon: Palette, roles: ["qa", "org_admin"] },
@@ -147,6 +148,7 @@ export const routeLabels: Record<string, string> = {
   "/account": "Account",
   "/org": "Administration",
   "/org/users": "Users & roles",
+  "/org/dashboards": "Dashboard design",
   "/org/departments": "Departments",
   "/org/invite": "Invitations",
   "/org/numbering": "Numbering",

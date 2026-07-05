@@ -18,6 +18,12 @@ const config: Config = {
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif'
+  			],
+  			mono: [
+  				'var(--font-mono)',
+  				'ui-monospace',
+  				'SFMono-Regular',
+  				'monospace'
   			]
   		},
   		colors: {
@@ -70,6 +76,11 @@ const config: Config = {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
+  			},
+  			brand: {
+  				navy: 'hsl(var(--brand-navy))',
+  				blue: 'hsl(var(--brand-blue))',
+  				teal: 'hsl(var(--brand-teal))'
   			},
   			status: {
   				draft: 'hsl(var(--status-draft))',

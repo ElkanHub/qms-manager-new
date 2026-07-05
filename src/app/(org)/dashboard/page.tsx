@@ -1,65 +1,53 @@
 import Link from "next/link";
-import {
-  GitPullRequestArrow,
-  CalendarClock,
-  Flame,
-  FileText,
-  GraduationCap,
-  Flag,
-} from "lucide-react";
-import { requireOrgUser } from "@/lib/auth";
+import { Suspense } from "react";
+import { Flag, PencilRuler } from "lucide-react";
+import { requireOrgUser, getMyRoles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/app/page-header";
-import { SectionCard } from "@/components/app/section-card";
-import { StatCard } from "@/components/app/stat-card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { DashboardWidget, WidgetSkeleton, type WidgetCtx } from "./widgets";
+import { DEFAULT_LAYOUTS, normalizeConfig, type WidgetConfig } from "./widget-catalogue";
 
-type Usage = {
-  window_days: number;
-  screens: { screen: string; actions: number }[];
-  funnel: Record<string, number>;
-};
-
-// D-DASHBOARD — state-of-the-system oversight. Counts are RLS-scoped to the tenant.
-// The audit viewer for document-control entities is the foundation's S-AUDIT at
-// /audit (filterable by action/entity).
-export default async function Dashboard() {
-  await requireOrgUser();
+// D-DASHBOARD — the configurable dashboard. Everyone gets the layout QA
+// designed for their department (falling back to the base Admin/Employee
+// dashboard, then to the code defaults), so each department sees the
+// information that matters to it. QA can preview any audience via
+// ?preview=admin|employee&dept=<id>. Counts and lists are RLS-scoped.
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ preview?: string; dept?: string }>;
+}) {
+  const user = await requireOrgUser();
+  const roles = await getMyRoles();
+  const isQA = roles.includes("qa");
   const supabase = await createClient();
-  const nowIso = new Date().toISOString();
 
-  const [openChanges, dueReview, retentionQueue, inFlight, openTraining, usage] = await Promise.all([
-    supabase.from("change_controls").select("*", { count: "exact", head: true })
-      .not("status", "in", "(closed,rejected)"),
-    supabase.from("documents").select("*", { count: "exact", head: true })
-      .eq("status", "active").lte("next_review_at", nowIso),
-    supabase.from("document_versions").select("*", { count: "exact", head: true })
-      .eq("status", "retained").lte("retention_until", nowIso),
-    supabase.from("documents").select("*", { count: "exact", head: true })
-      .in("status", ["in_review", "locked_in_cc", "pending_training", "scheduled"]),
-    supabase.from("training_assignments").select("*", { count: "exact", head: true })
-      .eq("status", "assigned"),
-    supabase.rpc("usage_summary", { p_days: 30 }),
-  ]);
+  // Audience: admins (QA / Org-Admin / HOD) get the admin dashboard, everyone
+  // else the employee one. QA may preview either, for any department.
+  const params = await searchParams;
+  const naturalKind: "admin" | "employee" =
+    isQA || roles.includes("org_admin") || roles.includes("hod") ? "admin" : "employee";
+  const previewing = isQA && (params.preview === "admin" || params.preview === "employee");
+  const kind = previewing ? (params.preview as "admin" | "employee") : naturalKind;
+  const departmentId = previewing ? (params.dept || null) : (user.department_id ?? null);
 
-  const cards = [
-    { label: "Open change controls", value: openChanges.count ?? 0, href: "/changes", icon: GitPullRequestArrow },
-    { label: "Documents due for review", value: dueReview.count ?? 0, href: "/periodic", icon: CalendarClock },
-    { label: "Retention-expiry queue", value: retentionQueue.count ?? 0, href: "/queues/destruction", icon: Flame },
-    { label: "In-flight documents", value: inFlight.count ?? 0, href: "/library", icon: FileText },
-    { label: "Incomplete training", value: openTraining.count ?? 0, href: "/training", icon: GraduationCap },
-  ];
+  // Resolution: department override → base → code default.
+  const { data: configs } = await supabase
+    .from("dashboard_configs")
+    .select("audience, department_id, widgets")
+    .eq("audience", kind);
+  const deptRow = departmentId
+    ? configs?.find((c) => c.department_id === departmentId)
+    : undefined;
+  const baseRow = configs?.find((c) => c.department_id === null);
+  const layout: WidgetConfig[] =
+    (deptRow && normalizeConfig(deptRow.widgets).length ? normalizeConfig(deptRow.widgets) : null) ??
+    (baseRow && normalizeConfig(baseRow.widgets).length ? normalizeConfig(baseRow.widgets) : null) ??
+    DEFAULT_LAYOUTS[kind];
 
-  // usage_summary is QA/org-admin only — everyone else just doesn't see the section.
-  const u = (usage.error ? null : usage.data) as Usage | null;
-  const funnelRows = u
-    ? [
-        { label: "Intakes started → dispatched", a: u.funnel.intakes_started, b: u.funnel.intakes_dispatched },
-        { label: "Drafts created → submitted", a: u.funnel.drafts_created, b: u.funnel.drafts_submitted },
-        { label: "Changes opened → closed", a: u.funnel.changes_opened, b: u.funnel.changes_closed },
-      ]
-    : [];
+  const ctx: WidgetCtx = { userId: user.id, departmentId };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-2">
@@ -67,6 +55,19 @@ export default async function Dashboard() {
         title="Dashboard"
         actions={
           <>
+            {previewing && (
+              <Badge variant="secondary" className="mr-1">
+                Previewing: {kind === "admin" ? "Admin" : "Employee"}
+              </Badge>
+            )}
+            {isQA && (
+              <Button variant="outline" asChild>
+                <Link href="/org/dashboards">
+                  <PencilRuler aria-hidden />
+                  Design dashboards
+                </Link>
+              </Button>
+            )}
             <Button variant="outline" asChild>
               <Link href="/audit">Audit trail →</Link>
             </Button>
@@ -80,54 +81,15 @@ export default async function Dashboard() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {cards.map((c) => (
-          <StatCard key={c.label} label={c.label} value={c.value} href={c.href} icon={c.icon} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        {layout.map((w, i) => (
+          <div key={`${w.key}-${i}`} className={w.size === "full" ? "lg:col-span-2" : undefined}>
+            <Suspense fallback={<WidgetSkeleton size={w.size ?? "half"} />}>
+              <DashboardWidget k={w.key} ctx={ctx} />
+            </Suspense>
+          </div>
         ))}
       </div>
-
-      {u && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SectionCard
-            title="Flow completion"
-            description={`Derived from the audit trail — last ${u.window_days} days.`}
-          >
-            <ul className="space-y-4 text-sm">
-              {funnelRows.map((r) => {
-                const a = r.a ?? 0;
-                const b = r.b ?? 0;
-                return (
-                  <li key={r.label} className="space-y-1.5">
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">{r.label}</span>
-                      <span className="font-medium tabular-nums">{a} → {b}</span>
-                    </div>
-                    <Progress value={a ? (b / a) * 100 : 0} />
-                  </li>
-                );
-              })}
-              <li className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Feedback flags</span>
-                <span className="font-medium tabular-nums">{u.funnel.feedback_flags ?? 0}</span>
-              </li>
-            </ul>
-          </SectionCard>
-
-          <SectionCard
-            title="Busiest screens"
-            description="Where work happens across the tenant."
-          >
-            <ul className="space-y-2 text-sm">
-              {u.screens.slice(0, 8).map((s) => (
-                <li key={s.screen} className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">{s.screen}</span>
-                  <span className="font-mono tabular-nums">{s.actions}</span>
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-        </div>
-      )}
     </div>
   );
 }
