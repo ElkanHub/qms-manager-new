@@ -87,15 +87,60 @@ export default async function DocumentRead({ params }: { params: Promise<{ id: s
   }
 
   if (error || !doc) {
+    // No effective version — but the viewer may be party to an in-flight one
+    // (RLS decides). Route them to their actual next step instead of a dead end.
+    const [{ data: docMeta }, { data: inflight }] = await Promise.all([
+      supabase.from("documents").select("document_number, title, status").eq("id", id).maybeSingle(),
+      supabase
+        .from("document_versions")
+        .select("id, status")
+        .eq("document_id", id)
+        .in("status", ["draft", "in_approval"])
+        .order("created_at", { ascending: false })
+        .limit(1),
+    ]);
+    const flight = inflight?.[0] ?? null;
     return (
       <div className="mx-auto max-w-4xl space-y-6 p-2">
-        <PageHeader title="Not available" />
+        <PageHeader
+          overline={docMeta?.document_number ?? undefined}
+          title={docMeta?.title ?? "Not available"}
+          actions={
+            flight?.status === "draft" ? (
+              <Button asChild>
+                <Link href={`/documents/${id}/draft`}>Continue draft →</Link>
+              </Button>
+            ) : undefined
+          }
+        />
         <Alert>
           <AlertDescription>
-            {error?.message ?? "This document has no effective version to read."}{" "}
-            <Link href="/library" className="font-medium underline underline-offset-4">
-              Back to library
-            </Link>
+            {flight?.status === "draft" ? (
+              <>
+                This document is still a <strong>draft</strong> — nothing is effective yet. Open
+                the{" "}
+                <Link href={`/documents/${id}/draft`} className="font-medium underline underline-offset-4">
+                  draft editor
+                </Link>{" "}
+                to review the content and submit it for review.
+              </>
+            ) : flight?.status === "in_approval" ? (
+              <>
+                This document is <strong>in review</strong> — it becomes readable here once QA
+                approves and it goes effective. Track it on the{" "}
+                <Link href={`/documents/${id}/history`} className="font-medium underline underline-offset-4">
+                  version history
+                </Link>
+                .
+              </>
+            ) : (
+              <>
+                {error?.message ?? "This document has no effective version to read."}{" "}
+                <Link href="/library" className="font-medium underline underline-offset-4">
+                  Back to library
+                </Link>
+              </>
+            )}
           </AlertDescription>
         </Alert>
       </div>
