@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import { EmptyState } from "@/components/app/empty-state";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -49,6 +50,13 @@ export default async function DocumentHistory({ params }: { params: Promise<{ id
         overline={document?.document_number ?? "—"}
         title={document?.title ?? "Version history"}
         meta="Which version was effective when"
+        actions={
+          (versions ?? []).some((v) => v.status === "draft") ? (
+            <Button asChild>
+              <Link href={`/documents/${id}/draft`}>Continue draft →</Link>
+            </Button>
+          ) : undefined
+        }
       />
 
       <Tabs defaultValue="history">
