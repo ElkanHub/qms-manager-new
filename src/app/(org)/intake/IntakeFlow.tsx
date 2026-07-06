@@ -37,7 +37,7 @@ const RATIONALE: Record<string, string> = {
 // (dispatch, type locks) or dispute (routes to QA). Surfaces the abandoned-draft fork.
 export function IntakeFlow({ effectiveDocs }: { effectiveDocs: Doc[] }) {
   const [started, setStarted] = useState<StartResult | null>(null);
-  const [done, setDone] = useState<{ documentId: string | null; resumed: boolean } | null>(null);
+  const [done, setDone] = useState<{ resultId: string | null; type: string; resumed: boolean } | null>(null);
   const [disputed, setDisputed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,7 +63,7 @@ export function IntakeFlow({ effectiveDocs }: { effectiveDocs: Doc[] }) {
     const res = await dispatchIntake(started.intakeId, resumeDraft ? started.abandonedDraftId : null);
     setBusy(false);
     if (!res.ok) return setError(res.error);
-    setDone({ documentId: res.documentId, resumed: resumeDraft });
+    setDone({ resultId: res.documentId, type: started.inferredType, resumed: resumeDraft });
   }
 
   async function dispute(reason: string) {
@@ -94,10 +94,29 @@ export function IntakeFlow({ effectiveDocs }: { effectiveDocs: Doc[] }) {
               <CheckCircle2 className="size-4" />
               <AlertTitle>Request dispatched.</AlertTitle>
               <AlertDescription>
-                {done.documentId ? (
-                  <Link href={`/documents/${done.documentId}/history`} className="underline">
-                    Open the {done.resumed ? "resumed" : "new"} document
-                  </Link>
+                {done.type === "NEW_SOP" && done.resultId ? (
+                  <span>
+                    Your {done.resumed ? "resumed" : "new"} draft is ready.{" "}
+                    <Link href={`/documents/${done.resultId}/draft`} className="underline">
+                      Open the draft editor
+                    </Link>{" "}
+                    to review the content, then hit <strong>Submit for review</strong> — it goes
+                    to your HOD for endorsement (or straight to QA review if you are the HOD or QA).
+                  </span>
+                ) : done.type === "RETIRE" ? (
+                  <span>
+                    Retirement requested. QA will run the pre-checks and decide it in the{" "}
+                    <strong>Retirements</strong> queue.
+                  </span>
+                ) : done.resultId ? (
+                  <span>
+                    A change control was opened.{" "}
+                    <Link href={`/changes/${done.resultId}`} className="underline">
+                      Continue it here
+                    </Link>{" "}
+                    — complete the impact assessment, then classification drives the required
+                    signatures.
+                  </span>
                 ) : (
                   <span>Routed to the appropriate pipe for QA.</span>
                 )}
