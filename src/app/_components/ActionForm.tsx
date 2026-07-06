@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { pingBadges } from "@/lib/badge-refresh";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 type Action = (formData: FormData) => Promise<Result>;
@@ -31,8 +32,12 @@ export function ActionForm({
   useEffect(() => {
     if (!state || state === lastToasted.current) return;
     lastToasted.current = state;
-    if (state.ok) toast.success(state.message ?? "Done.");
-    else toast.error(state.error);
+    if (state.ok) {
+      toast.success(state.message ?? "Done.");
+      pingBadges(); // a mutation likely moved a queue — refresh the sidebar counts now
+    } else {
+      toast.error(state.error);
+    }
   }, [state]);
 
   return (
