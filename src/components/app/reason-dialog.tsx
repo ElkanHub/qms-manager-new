@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { pingBadges } from "@/lib/badge-refresh";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 type Action = (formData: FormData) => Promise<Result>;
@@ -69,6 +70,7 @@ export function ReasonDialog({
       const result = await action(formData);
       if (result.ok) {
         toast.success(result.message ?? "Done.");
+        pingBadges(); // decisions move queues — refresh the sidebar counts now
         setOpen(false);
         setReason("");
         setError(null);

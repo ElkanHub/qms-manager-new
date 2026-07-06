@@ -8,8 +8,10 @@ import { createClient } from "@/lib/supabase/server";
 export const getQueueCounts = cache(async (): Promise<Record<string, number>> => {
   const supabase = await createClient();
   const nowIso = new Date().toISOString();
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth.user?.id ?? "00000000-0000-0000-0000-000000000000";
 
-  const [endorse, qaReview, retirements, destruction, periodic] = await Promise.all([
+  const [endorse, qaReview, retirements, destruction, periodic, training, copies] = await Promise.all([
     supabase
       .from("approval_requests")
       .select("*", { count: "exact", head: true })
@@ -34,6 +36,16 @@ export const getQueueCounts = cache(async (): Promise<Record<string, number>> =>
       .select("*", { count: "exact", head: true })
       .eq("status", "active")
       .lte("next_review_at", nowIso),
+    // Personal: MY open training (assignments are tenant-readable, so filter to me).
+    supabase
+      .from("training_assignments")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", me)
+      .neq("status", "completed"),
+    // Copies needing recall — issued controlled/display copies of a no-longer-effective version.
+    supabase
+      .from("copies_recall_due")
+      .select("*", { count: "exact", head: true }),
   ]);
 
   return {
@@ -42,5 +54,7 @@ export const getQueueCounts = cache(async (): Promise<Record<string, number>> =>
     retirements: retirements.count ?? 0,
     destruction: destruction.count ?? 0,
     periodic: periodic.count ?? 0,
+    training: training.count ?? 0,
+    copies: copies.count ?? 0,
   };
 });

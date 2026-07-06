@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { Lock } from "lucide-react";
+import { fetchQueueCounts } from "@/app/badge-actions";
+import { BADGE_EVENT } from "@/lib/badge-refresh";
 import {
   Sidebar,
   SidebarContent,
@@ -45,6 +48,47 @@ export function AppSidebar({
   moduleStates?: Record<string, boolean>;
 }) {
   const pathname = usePathname();
+
+  // Live badges: seeded server-side, then kept fresh client-side — a steady
+  // poll, an immediate refetch on window focus/visibility and route change,
+  // and an instant ping fired by every successful mutation (ActionForm /
+  // ReasonDialog dispatch BADGE_EVENT), so a decision updates its count at once.
+  const [live, setLive] = useState<Record<string, number>>(counts);
+  const inflight = useRef(false);
+  const refresh = useCallback(async () => {
+    if (inflight.current) return;
+    inflight.current = true;
+    try {
+      setLive(await fetchQueueCounts());
+    } catch {
+      // transient network failure — the next tick retries
+    } finally {
+      inflight.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (plane !== "org") return;
+    const tick = setInterval(refresh, 15000);
+    const onWake = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    window.addEventListener(BADGE_EVENT, onWake as EventListener);
+    window.addEventListener("focus", onWake);
+    document.addEventListener("visibilitychange", onWake);
+    return () => {
+      clearInterval(tick);
+      window.removeEventListener(BADGE_EVENT, onWake as EventListener);
+      window.removeEventListener("focus", onWake);
+      document.removeEventListener("visibilitychange", onWake);
+    };
+  }, [plane, refresh]);
+
+  // A navigation usually follows an action — refetch on every route change too.
+  useEffect(() => {
+    if (plane === "org") void refresh();
+  }, [pathname, plane, refresh]);
+
   const groups: NavGroup[] = plane === "platform" ? platformNav : orgNav;
   const canSee = (item: NavItem) => !item.roles || item.roles.some((r) => roles.includes(r));
   const isActive = (href: string) =>
@@ -81,7 +125,7 @@ export function AppSidebar({
               {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
               <SidebarMenu>
                 {items.map((item) => {
-                  const count = item.badge ? counts[item.badge] : undefined;
+                  const count = item.badge ? live[item.badge] : undefined;
                   if (moduleOff(item)) {
                     return (
                       <SidebarMenuItem key={item.href}>
