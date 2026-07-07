@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { Star } from "lucide-react";
+import { Star, PencilLine } from "lucide-react";
 import { requireOrgUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/app/page-header";
+import { SectionCard } from "@/components/app/section-card";
+import { StatusBadge } from "@/components/app/status-badge";
 import { EmptyState } from "@/components/app/empty-state";
 import { DataTable } from "@/components/app/data-table";
 import { ModuleOffAlert } from "@/components/app/module-off-alert";
@@ -39,6 +41,16 @@ export default async function Library({
   if (q) query = query.or(`title.ilike.%${q}%,document_number.ilike.%${q}%`);
   if (category) query = query.eq("category", category);
   const { data: docs } = await query;
+
+  // The user's own in-flight documents — drafts and in-review versions they
+  // authored. Without this the pipeline is invisible: after upload there was no
+  // way back to the draft editor to submit it for review.
+  const { data: myDrafts } = await supabase
+    .from("documents")
+    .select("id, document_number, title, status")
+    .eq("owner_id", user.id)
+    .in("status", ["draft", "in_review"])
+    .order("updated_at", { ascending: false });
 
   const [{ data: favs }, { data: cats }, { data: docCats }, { data: locks }] = await Promise.all([
     supabase.from("document_favorites").select("document_id"),
@@ -91,6 +103,33 @@ export default async function Library({
           module="SOP Library"
           detail="Showing a plain fallback list — reading is unaffected."
         />
+      )}
+      {(myDrafts ?? []).length > 0 && (
+        <SectionCard
+          title="Your drafts & in-flight"
+          description="Documents you started that aren't effective yet — open one to edit and submit it into the pipeline."
+        >
+          <ul className="divide-y">
+            {(myDrafts ?? []).map((d) => (
+              <li key={d.id} className="flex items-center gap-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {d.document_number ?? "unnumbered"}
+                    </span>
+                    <StatusBadge value={d.status} dot />
+                  </div>
+                  <p className="truncate font-medium">{d.title ?? "Untitled"}</p>
+                </div>
+                <Button size="sm" asChild>
+                  <Link href={`/documents/${d.id}/draft`}>
+                    <PencilLine /> Open draft
+                  </Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
       )}
       <DataTable
         columns={columns}
