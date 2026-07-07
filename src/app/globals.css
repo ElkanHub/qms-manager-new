@@ -137,6 +137,30 @@
     background: hsl(var(--brand-teal));
     color: hsl(0 0% 100%);
   }
+
+  /* Marketing pages are locked to light mode regardless of user theme —
+     re-asserts the :root light Layer A values so a .dark <html> never
+     bleeds into the landing/contact pages. */
+  .marketing-light {
+    color-scheme: light;
+    --background: 0 0% 94%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 95%;
+    --accent-foreground: 0 0% 9%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 63%;
+  }
 }
 
 @layer utilities {
