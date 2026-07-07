@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 
 /**
@@ -242,13 +243,36 @@ export default function SectionGrainient({
     opacity ??
     (preset !== "custom" && darkPresets.includes(preset as PresetKey) ? 1 : 0.7)
 
+  // Defer WebGL context creation until the section nears the viewport, so a
+  // long landing page doesn't spin up every canvas' context at once on load.
+  // The 300px margin mounts it just before it scrolls into view (no pop-in);
+  // the hero, being at the top, mounts immediately.
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || mounted) return
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setMounted(true)
+          io.disconnect()
+        }
+      },
+      { rootMargin: "300px" }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [mounted])
+
   return (
     <div
+      ref={ref}
       aria-hidden
       className={`pointer-events-none absolute inset-0 z-0 ${className}`.trim()}
       style={{ opacity: resolvedOpacity }}
     >
-      <Grainient {...defaults} {...grainientProps} />
+      {mounted && <Grainient {...defaults} {...grainientProps} />}
     </div>
   )
 }

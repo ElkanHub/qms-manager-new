@@ -522,11 +522,39 @@ export default function MetallicPaint({
       rafRef.current = requestAnimationFrame(render);
     };
 
-    lastTimeRef.current = performance.now();
-    rafRef.current = requestAnimationFrame(render);
+    // Only animate while the canvas is on-screen and the tab is visible —
+    // this full-res refraction shader has no reason to burn 60fps behind
+    // other sections or in a hidden tab. Reset the clock on resume so the
+    // non-mouse mode doesn't jump on a large delta.
+    let isVisible = true;
+    let isPageVisible = !document.hidden;
+    const start = () => {
+      if (!isVisible || !isPageVisible || rafRef.current) return;
+      lastTimeRef.current = performance.now();
+      rafRef.current = requestAnimationFrame(render);
+    };
+    const stop = () => {
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    };
+
+    const io = new IntersectionObserver(
+      ([entry]) => { isVisible = entry.isIntersecting; isVisible ? start() : stop(); },
+      { threshold: 0 }
+    );
+    io.observe(canvas);
+
+    const onVisibility = () => {
+      isPageVisible = !document.hidden;
+      isPageVisible ? start() : stop();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    start();
 
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      stop();
+      io.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
       canvas.removeEventListener('mousemove', handleMouseMove);
     };
   }, [ready, textureReady]);
