@@ -237,6 +237,10 @@ const Grainient: React.FC<GrainientProps> = ({
       let isPageVisible = !document.hidden
       const t0 = performance.now()
 
+      // Static presets (no time/warp motion, no animated grain) paint one
+      // frame and never schedule rAF — a frozen backdrop then costs 0 fps.
+      const isStatic = timeSpeed === 0 && warpSpeed === 0 && !grainAnimated
+
       const loop = (t: number) => {
         (program.uniforms.iTime as { value: number }).value = (t - t0) * 0.001
         renderer.render({ scene: mesh })
@@ -244,7 +248,9 @@ const Grainient: React.FC<GrainientProps> = ({
       }
 
       const tryStart = () => {
-        if (isVisible && isPageVisible && raf === 0) raf = requestAnimationFrame(loop)
+        if (!isVisible || !isPageVisible) return
+        if (isStatic) { renderer.render({ scene: mesh }); return }
+        if (raf === 0) raf = requestAnimationFrame(loop)
       }
       const tryStop = () => {
         if (raf !== 0) { cancelAnimationFrame(raf); raf = 0 }

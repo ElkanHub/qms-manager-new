@@ -31,9 +31,9 @@ export const GRAINIENT_PRESETS = {
     color1: "#0f172a",
     color2: "#0284c7",
     color3: "#0d9488",
-    timeSpeed: 0.25,
+    timeSpeed: 0.0, // frozen (like footer) — no per-frame render, faster page
     warpFrequency: 5.0,
-    warpSpeed: 2.0,
+    warpSpeed: 0.0, // frozen
     warpAmplitude: 50.0,
     warpStrength: 1.3,
     rotationAmount: 500.0,
