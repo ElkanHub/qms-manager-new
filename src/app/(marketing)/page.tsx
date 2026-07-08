@@ -17,12 +17,12 @@ export default function LandingPage() {
       <section className="relative mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="relative overflow-hidden rounded-2xl md:rounded-[2rem] border border-border/50 bg-muted/20 shadow-2xl">
           <Image
-            src="/marketing/hero-dashboard2.jpg"
+            src="/marketing/hero-dashboard2.webp"
             alt="QMS-MANAJA dashboard overview"
-            width={2400}
-            height={1400}
+            width={2000}
+            height={1116}
+            sizes="(min-width: 1440px) 1440px, 100vw"
             className="w-full h-auto object-cover"
-            priority
           />
         </div>
       </section>
