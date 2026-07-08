@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { env } from "@/lib/env";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { AuthShell } from "@/components/app/auth-shell";
 
 // S-MFA — mandatory second factor. Enrolls TOTP on first use, otherwise challenges.
 // "Remember this device" records a trusted device so returning users on known
@@ -76,63 +76,69 @@ export default function Mfa() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <Card className="mx-auto w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Step 2 of 2</p>
-          <CardTitle className="pt-1 text-xl">Verify it&apos;s you</CardTitle>
-          <CardDescription>
+    <AuthShell
+      headline={{
+        title: "One more step.",
+        body: "Confirm it's really you. Multi-factor keeps your QMS-MANAJA workspace locked to you alone.",
+      }}
+    >
+      <div className="space-y-6">
+        <div className="space-y-1.5 text-center lg:text-left">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Step 2 of 2
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Verify it&apos;s you</h1>
+          <p className="text-sm text-muted-foreground">
             {qr
               ? "Scan the QR code with your authenticator app, then enter the 6-digit code."
               : "Enter the 6-digit code from your authenticator app."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {qr && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={qr} alt="MFA QR code" className="mx-auto h-40 w-40 rounded-md border" />
-          )}
-
-          <div className="flex justify-center">
-            <InputOTP maxLength={6} value={code} onChange={setCode} disabled={busy}>
-              <InputOTPGroup>
-                {[0, 1, 2, 3, 4, 5].map((i) => (
-                  <InputOTPSlot key={i} index={i} />
-                ))}
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-
-          <div className="flex items-center justify-center gap-2">
-            <Checkbox
-              id="remember"
-              checked={remember}
-              onCheckedChange={(c) => setRemember(c === true)}
-            />
-            <Label htmlFor="remember" className="text-sm font-normal text-muted-foreground">
-              Remember this device
-            </Label>
-          </div>
-
-          <Button onClick={verify} disabled={busy || code.length < 6} className="w-full">
-            Verify
-          </Button>
-
-          {error && <p className="text-center text-sm text-destructive">{error}</p>}
-
-          <p className="text-center text-xs text-muted-foreground">
-            Didn&apos;t get a code?{" "}
-            <button
-              type="button"
-              onClick={resend}
-              disabled={busy}
-              className="font-medium text-foreground underline underline-offset-4 disabled:opacity-40"
-            >
-              Resend
-            </button>
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        {qr && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={qr} alt="MFA QR code" className="mx-auto h-40 w-40 rounded-md border bg-white p-1" />
+        )}
+
+        <div className="flex justify-center lg:justify-start">
+          <InputOTP maxLength={6} value={code} onChange={setCode} disabled={busy}>
+            <InputOTPGroup>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <InputOTPSlot key={i} index={i} />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="remember"
+            checked={remember}
+            onCheckedChange={(c) => setRemember(c === true)}
+          />
+          <Label htmlFor="remember" className="text-sm font-normal text-muted-foreground">
+            Remember this device
+          </Label>
+        </div>
+
+        <Button onClick={verify} disabled={busy || code.length < 6} size="lg" className="w-full">
+          Verify
+        </Button>
+
+        {error && <p className="text-center text-sm text-destructive lg:text-left">{error}</p>}
+
+        <p className="text-center text-xs text-muted-foreground lg:text-left">
+          Didn&apos;t get a code?{" "}
+          <button
+            type="button"
+            onClick={resend}
+            disabled={busy}
+            className="font-medium text-foreground underline underline-offset-4 disabled:opacity-40"
+          >
+            Resend
+          </button>
+        </p>
+      </div>
+    </AuthShell>
   );
 }
