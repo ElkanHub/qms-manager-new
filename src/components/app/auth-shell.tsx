@@ -16,19 +16,22 @@ export function AuthShell({
 }) {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
-      {/* Left — brand + form */}
-      <div className="relative flex flex-col gap-8 overflow-hidden p-6 md:p-10">
-        {/* Frozen, lazy-mounted grainient — a whisper of the marketing texture,
-            kept faint so the form stays crisp in both light and dark. */}
-        <SectionGrainient preset="splash" opacity={0.1} />
+      {/* Left — brand + form over the full-colour grainient. bg-brand-navy is the
+          base so there's no light flash before the (frozen, lazy) canvas paints. */}
+      <div className="relative flex flex-col gap-8 overflow-hidden bg-brand-navy p-6 md:p-10">
+        <SectionGrainient preset="splash" opacity={1} />
         <div className="relative z-10 flex justify-center md:justify-start">
           <Link href="/" className="flex items-center gap-2" aria-label="QMS-MANAJA home">
-            <Logo />
-            <span className="font-semibold tracking-tight">QMS-MANAJA</span>
+            <Logo forceDark />
+            <span className="font-semibold tracking-tight text-white">QMS-MANAJA</span>
           </Link>
         </div>
         <div className="relative z-10 flex flex-1 items-center justify-center">
-          <div className="w-full max-w-sm">{children}</div>
+          {/* Solid card keeps the form fully legible while the vibrant grainient
+              frames it and shows behind the brand mark. */}
+          <div className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-2xl sm:p-8">
+            {children}
+          </div>
         </div>
       </div>
 
