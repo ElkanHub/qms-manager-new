@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { env } from "@/lib/env";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthShell } from "@/components/app/auth-shell";
 
 // S-SIGNIN — Google SSO only. No password fields, no "create account" / "sign up"
 // link anywhere. The absence of a signup path is itself the requirement (rule 0.5).
@@ -22,27 +21,34 @@ export default function SignIn() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <Card className="mx-auto w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-6 text-foreground" />
-            <span className="text-lg font-semibold">QMS Manager</span>
-          </div>
-          <CardTitle className="pt-2 text-xl">Sign in</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button onClick={signInWithGoogle} className="w-full gap-2">
-            <GoogleGlyph />
-            Sign in with Google
-          </Button>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <p className="text-center text-xs text-muted-foreground">
-            Invite-only — contact your QA admin.
+    <AuthShell
+      headline={{
+        title: "Welcome back.",
+        body: "Manage SOPs, route approvals, and keep every change controlled — all in one audited system.",
+      }}
+    >
+      <div className="space-y-6">
+        <div className="space-y-1.5 text-center lg:text-left">
+          <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+          <p className="text-sm text-muted-foreground">
+            Use your organization Google account to continue.
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        <Button onClick={signInWithGoogle} size="lg" className="w-full gap-2">
+          <GoogleGlyph />
+          Continue with Google
+        </Button>
+
+        {error && (
+          <p className="text-center text-sm text-destructive lg:text-left">{error}</p>
+        )}
+
+        <p className="text-center text-xs text-muted-foreground lg:text-left">
+          Invite-only — no public sign-up. Contact your QA admin for access.
+        </p>
+      </div>
+    </AuthShell>
   );
 }
 
