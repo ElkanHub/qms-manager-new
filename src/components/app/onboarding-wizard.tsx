@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SignatureCapture } from "@/components/app/signature-capture";
+import { AvatarUpload } from "@/components/app/avatar-upload";
 import type { OnbStep, OnbField } from "@/lib/onboarding-defaults";
 
 // The onboarding wizard — one step per screen, a progress bar that moves with
@@ -100,6 +101,10 @@ export function OnboardingWizard({
             preview={preview}
             onCaptured={() => setSigned(true)}
           />
+        ) : step.avatar ? (
+          <div className="pt-2">
+            <AvatarUpload name={answers.full_name || "You"} preview={preview} />
+          </div>
         ) : (
           <div className="space-y-4 pt-2">
             {step.fields.map((f) => (

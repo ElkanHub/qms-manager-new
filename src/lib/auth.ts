@@ -8,6 +8,7 @@ export type AppUser = {
   department_id: string | null;
   email: string;
   full_name: string | null;
+  avatar_url: string | null;
   plane: "org" | "platform";
   initial_role: string | null;
   status: "active" | "deactivated";
