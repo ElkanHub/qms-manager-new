@@ -24,7 +24,10 @@ export function AppHeader({
   moduleStates?: Record<string, boolean>;
 }) {
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
+    // Brand-colored bar (navy→blue gradient, constant across themes). The `dark`
+    // class flips the subtree to the dark token set so every control reads as
+    // light-on-navy — the same trick the platform sidebar relies on.
+    <header className="dark sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/10 bg-gradient-to-r from-brand-navy to-brand-blue px-4 text-white">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-6" />
       <Breadcrumbs labels={breadcrumbLabels} />
