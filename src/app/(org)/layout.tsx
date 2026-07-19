@@ -31,16 +31,27 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
   const moduleStates = Object.fromEntries((mods ?? []).map((m) => [m.module_key, m.enabled]));
   const isQaOrAdmin = roles.includes("qa") || roles.includes("org_admin");
   const canBroadcast = isQaOrAdmin || roles.includes("hod");
+  const deptName = (departments ?? []).find((d) => d.id === user.department_id)?.name;
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
-      <AppSidebar plane="org" orgName={org?.name ?? "QMS Manager"} roles={roles} counts={counts} moduleStates={moduleStates} />
+      <AppSidebar
+        plane="org"
+        orgName={org?.name ?? "QMS Manager"}
+        roles={roles}
+        counts={counts}
+        moduleStates={moduleStates}
+        userName={user.full_name ?? user.email}
+        userSubtitle={deptName ?? user.email}
+        avatarUrl={user.avatar_url}
+      />
       <SidebarInset>
         <AppHeader
           plane="org"
           roles={roles}
           name={user.full_name}
           email={user.email}
+          avatarUrl={user.avatar_url}
           moduleStates={moduleStates}
         />
         {/* Pages currently supply their own <main>; a div keeps a single landmark

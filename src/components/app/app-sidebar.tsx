@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { Lock } from "lucide-react";
+import { Lock, Settings2 } from "lucide-react";
 import { fetchQueueCounts } from "@/app/badge-actions";
 import { BADGE_EVENT } from "@/lib/badge-refresh";
 import {
@@ -20,6 +20,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   orgNav,
   orgFooterNav,
@@ -39,6 +40,9 @@ export function AppSidebar({
   roles,
   counts = {},
   moduleStates = {},
+  userName,
+  userSubtitle,
+  avatarUrl,
 }: {
   plane: "org" | "platform";
   orgName: string;
@@ -46,6 +50,10 @@ export function AppSidebar({
   counts?: Record<string, number>;
   /** Switchboard state per module key; a module-linked item greys out when off. */
   moduleStates?: Record<string, boolean>;
+  /** Footer account preview. */
+  userName: string;
+  userSubtitle: string;
+  avatarUrl?: string | null;
 }) {
   const pathname = usePathname();
 
@@ -101,6 +109,15 @@ export function AppSidebar({
     toast(`${label} isn't part of your organization's plan yet`, {
       description: "Ask your platform administrator about enabling it for your organization.",
     });
+
+  const settingsHref = plane === "platform" ? "/platform/settings" : "/settings";
+  const initials = userName
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
 
   return (
     // Platform plane is signalled by the header badge + "Platform" label, so the
@@ -159,10 +176,10 @@ export function AppSidebar({
         })}
       </SidebarContent>
 
-      {plane === "org" && (
-        <SidebarFooter>
-          <SidebarMenu>
-            {orgFooterNav.map((item) => (
+      <SidebarFooter className="gap-1">
+        <SidebarMenu>
+          {plane === "org" &&
+            orgFooterNav.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.label}>
                   <Link href={item.href}>
@@ -172,9 +189,31 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-          </SidebarMenu>
-        </SidebarFooter>
-      )}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={isActive(settingsHref)} tooltip="Settings">
+              <Link href={settingsHref}>
+                <Settings2 />
+                <span>Settings</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
+        {/* Account preview — links into Settings; collapses to just the avatar. */}
+        <Link
+          href={settingsHref}
+          className="flex items-center gap-2 rounded-md p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <Avatar className="size-8 shrink-0">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={userName} />}
+            <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <div className="truncate text-sm font-medium">{userName}</div>
+            <div className="truncate text-xs text-muted-foreground">{userSubtitle}</div>
+          </div>
+        </Link>
+      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>

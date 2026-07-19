@@ -34,8 +34,8 @@ export function SignaturePicker({
         <PenLine className="size-4" />
         <AlertDescription>
           You have no signature on file — capture one under{" "}
-          <Link href="/account" className="font-medium underline underline-offset-4">
-            Account → Signature
+          <Link href="/settings" className="font-medium underline underline-offset-4">
+            Settings → Signature
           </Link>{" "}
           before signing.
         </AlertDescription>

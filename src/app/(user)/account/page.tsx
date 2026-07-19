@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth";
 
-// Account details now live as the first tab of /settings (the personal hub).
-// This route is kept as a permanent redirect so old links keep working.
-export default function Account() {
-  redirect("/settings");
+// Account details now live as the first tab of the plane's /settings page. This
+// route is kept as a plane-aware redirect so old links keep working.
+export default async function Account() {
+  const user = await requireUser();
+  redirect(user.plane === "platform" ? "/platform/settings" : "/settings");
 }
