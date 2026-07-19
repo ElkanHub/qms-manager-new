@@ -20,7 +20,6 @@ import {
   Mail,
   FileUp,
   Flag,
-  UserCircle,
   ShieldCheck,
   Server,
   KeyRound,
@@ -101,7 +100,7 @@ export const orgNav: NavGroup[] = [
 
 export const orgFooterNav: NavItem[] = [
   { label: "Flag this", href: "/feedback", icon: Flag },
-  { label: "Account", href: "/account", icon: UserCircle },
+  { label: "Settings", href: "/settings", icon: Settings2 },
 ];
 
 export const platformNav: NavGroup[] = [
@@ -146,6 +145,7 @@ export const routeLabels: Record<string, string> = {
   "/audit": "Audit trail",
   "/feedback": "Flag this",
   "/account": "Account",
+  "/settings": "Settings",
   "/org": "Administration",
   "/org/users": "Users & roles",
   "/org/dashboards": "Dashboard design",

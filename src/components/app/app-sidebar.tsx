@@ -103,10 +103,10 @@ export function AppSidebar({
     });
 
   return (
-    // Platform plane is deliberately distinct (§4.4): the `dark` class flips the
-    // sidebar subtree to the dark token set (dark-in-light-mode) so operators
-    // always know which plane they're on.
-    <Sidebar collapsible="icon" className={plane === "platform" ? "dark" : undefined}>
+    // Platform plane is signalled by the header badge + "Platform" label, so the
+    // sidebar follows the active theme like the org one (no forced dark subtree —
+    // a dark sidebar in light mode reads as broken, not as a plane marker).
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
           <ShieldCheck className="size-5 shrink-0" />
