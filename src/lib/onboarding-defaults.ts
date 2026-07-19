@@ -15,6 +15,7 @@ export type OnbStep = {
   title: string;
   locked?: boolean;
   signature?: boolean;
+  avatar?: boolean;
   fields: OnbField[];
 };
 export type Audience = "org_setup" | "member";
@@ -41,6 +42,13 @@ const ORGANIZATION: OnbStep = {
     { key: "branding_color_accent", label: "Accent color", type: "color" },
   ],
 };
+const AVATAR: OnbStep = {
+  key: "avatar",
+  title: "Your profile photo",
+  locked: true,
+  avatar: true,
+  fields: [],
+};
 const SIGNATURE: OnbStep = {
   key: "signature",
   title: "Your signature",
@@ -50,8 +58,8 @@ const SIGNATURE: OnbStep = {
 };
 
 export const DEFAULT_STEPS: Record<Audience, OnbStep[]> = {
-  org_setup: [PROFILE, ORGANIZATION, SIGNATURE],
-  member: [PROFILE, SIGNATURE],
+  org_setup: [PROFILE, AVATAR, ORGANIZATION, SIGNATURE],
+  member: [PROFILE, AVATAR, SIGNATURE],
 };
 
 export const AUDIENCE_LABELS: Record<Audience, string> = {
