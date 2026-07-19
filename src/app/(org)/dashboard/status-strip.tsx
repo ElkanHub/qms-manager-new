@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { FilePen, GitPullRequestArrow, AlertTriangle, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { OnlineNow } from "./online-now";
 
 // D-DASHBOARD status strip — a persistent glance at the top of the dashboard,
 // distinct from the configurable widget grid below it. Four live numbers a
@@ -9,7 +10,13 @@ import { createClient } from "@/lib/supabase/server";
 // the open-change backlog, and the review-overdue risk. Org-wide for admins
 // (departmentId null); department-scoped for everyone else. RLS scopes to tenant
 // regardless. Tolerant of empty/errored data — a cell just shows 0.
-export async function StatusStrip({ departmentId }: { departmentId: string | null }) {
+export async function StatusStrip({
+  departmentId,
+  orgId,
+}: {
+  departmentId: string | null;
+  orgId: string | null;
+}) {
   const supabase = await createClient();
   const now = Date.now();
   const online15 = new Date(now - 15 * 60_000).toISOString();
@@ -20,8 +27,12 @@ export async function StatusStrip({ departmentId }: { departmentId: string | nul
   const scoped = <T extends { eq: (c: string, v: string) => T }>(q: T) =>
     departmentId ? q.eq("department_id", departmentId) : q;
 
+  // Seed the live "online now" cell — org-scoped (RLS also scopes to tenant).
+  let actorsQuery = supabase.from("audit_trail").select("actor_email").gte("occurred_at", online15).limit(1000);
+  if (orgId) actorsQuery = actorsQuery.eq("org_id", orgId);
+
   const [actors, updatedWeek, openChanges, overdueReview] = await Promise.all([
-    supabase.from("audit_trail").select("actor_email").gte("occurred_at", online15).limit(1000),
+    actorsQuery,
     scoped(
       supabase.from("documents").select("*", { count: "exact", head: true })
         .eq("status", "active").gte("updated_at", week),
@@ -36,19 +47,9 @@ export async function StatusStrip({ departmentId }: { departmentId: string | nul
     ),
   ]);
 
-  const onlineNow = new Set((actors.data ?? []).map((r) => r.actor_email).filter(Boolean)).size;
+  const onlineSeed = new Set((actors.data ?? []).map((r) => r.actor_email).filter(Boolean)).size;
 
-  // `online` renders a pulsing dot instead of an icon; `alert` colours the number
-  // when there's a risk to act on.
-  const cells: {
-    label: string;
-    value: number;
-    href: string;
-    icon?: LucideIcon;
-    online?: boolean;
-    alert?: boolean;
-  }[] = [
-    { label: "Online now", value: onlineNow, href: "/audit", online: true },
+  const cells: { label: string; value: number; href: string; icon: LucideIcon; alert?: boolean }[] = [
     { label: "SOPs updated this week", value: updatedWeek.count ?? 0, href: "/library", icon: FilePen },
     { label: "Open change controls", value: openChanges.count ?? 0, href: "/changes", icon: GitPullRequestArrow },
     {
@@ -62,18 +63,16 @@ export async function StatusStrip({ departmentId }: { departmentId: string | nul
 
   // A thin inline strip (old project's principles): items flow and wrap with
   // gaps, the number sits inline with its label, and the vertical dividers hide
-  // on mobile so a wrapped layout never leaves a dangling separator.
+  // on mobile so a wrapped layout never leaves a dangling separator. "Online now"
+  // is the one live cell (client-polled); the rest are server-rendered.
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-muted/40 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-      {cells.map((c, i) => (
+      <OnlineNow initial={onlineSeed} href="/audit" />
+      {cells.map((c) => (
         <Fragment key={c.label}>
-          {i > 0 && <div className="hidden h-4 w-px bg-border sm:block" aria-hidden />}
+          <div className="hidden h-4 w-px bg-border sm:block" aria-hidden />
           <Link href={c.href} className="flex items-center gap-2 transition-colors hover:text-foreground">
-            {c.online ? (
-              <span className="size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" aria-hidden />
-            ) : (
-              c.icon && <c.icon className={`size-3.5 shrink-0 ${c.alert ? "text-status-blocked" : ""}`} aria-hidden />
-            )}
+            <c.icon className={`size-3.5 shrink-0 ${c.alert ? "text-status-blocked" : ""}`} aria-hidden />
             <span className={`tabular-nums ${c.alert ? "text-status-blocked" : "text-foreground"}`}>{c.value}</span>
             <span>{c.label}</span>
           </Link>
