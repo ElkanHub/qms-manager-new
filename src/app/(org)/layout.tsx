@@ -24,11 +24,16 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
   // server-side and breadcrumbs resolve labels with a single cached lookup.
   const [{ data: org }, { data: mods }, { data: prefs }, { data: departments }] = await Promise.all([
     supabase.from("organizations").select("name").eq("tenant_id", user.tenant_id).maybeSingle(),
-    supabase.from("tenant_modules").select("module_key, enabled"),
+    supabase.from("tenant_modules").select("module_key, enabled, config"),
     supabase.from("user_prefs").select("sound_enabled").eq("user_id", user.id).maybeSingle(),
     supabase.from("departments").select("id, name").order("name"),
   ]);
   const moduleStates = Object.fromEntries((mods ?? []).map((m) => [m.module_key, m.enabled]));
+  // Platform's per-module choice for off items: hide them, or keep them as a
+  // greyed upsell (the default). Only off items honour this.
+  const moduleHidden = Object.fromEntries(
+    (mods ?? []).map((m) => [m.module_key, (m.config as { hidden?: boolean } | null)?.hidden === true]),
+  );
   const isQaOrAdmin = roles.includes("qa") || roles.includes("org_admin");
   const canBroadcast = isQaOrAdmin || roles.includes("hod");
   const deptName = (departments ?? []).find((d) => d.id === user.department_id)?.name;
@@ -41,6 +46,7 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
         roles={roles}
         counts={counts}
         moduleStates={moduleStates}
+        moduleHidden={moduleHidden}
         userName={user.full_name ?? user.email}
         userSubtitle={deptName ?? user.email}
         avatarUrl={user.avatar_url}
