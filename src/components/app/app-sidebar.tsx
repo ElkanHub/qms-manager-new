@@ -40,6 +40,7 @@ export function AppSidebar({
   roles,
   counts = {},
   moduleStates = {},
+  moduleHidden = {},
   userName,
   userSubtitle,
   avatarUrl,
@@ -50,6 +51,8 @@ export function AppSidebar({
   counts?: Record<string, number>;
   /** Switchboard state per module key; a module-linked item greys out when off. */
   moduleStates?: Record<string, boolean>;
+  /** Off modules the platform chose to hide from the sidebar entirely (vs. greyed upsell). */
+  moduleHidden?: Record<string, boolean>;
   /** Footer account preview. */
   userName: string;
   userSubtitle: string;
@@ -105,6 +108,9 @@ export function AppSidebar({
   // nudged toward it — display only; the server guards regardless.
   const moduleOff = (item: NavItem) =>
     plane === "org" && !!item.moduleKey && moduleStates[item.moduleKey] !== true;
+  // An off item the platform chose to hide drops out of the sidebar entirely,
+  // rather than showing as the greyed upsell.
+  const isHidden = (item: NavItem) => moduleOff(item) && moduleHidden[item.moduleKey!] === true;
   const nudge = (label: string) =>
     toast(`${label} isn't part of your organization's plan yet`, {
       description: "Ask your platform administrator about enabling it for your organization.",
@@ -135,7 +141,7 @@ export function AppSidebar({
 
       <SidebarContent>
         {groups.map((group, gi) => {
-          const items = group.items.filter(canSee);
+          const items = group.items.filter(canSee).filter((i) => !isHidden(i));
           if (items.length === 0) return null;
           return (
             <SidebarGroup key={group.label ?? `g${gi}`}>
