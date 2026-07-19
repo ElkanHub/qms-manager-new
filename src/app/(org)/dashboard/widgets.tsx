@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  GitPullRequestArrow,
   CalendarClock,
   Flame,
   FileText,
@@ -65,9 +64,9 @@ function Row({
 async function QualityKpis() {
   const supabase = await createClient();
   const nowIso = new Date().toISOString();
-  const [openChanges, dueReview, retentionQueue, inFlight, openTraining] = await Promise.all([
-    supabase.from("change_controls").select("*", { count: "exact", head: true })
-      .not("status", "in", "(closed,rejected)"),
+  // Open change controls lives in the always-on status strip now, so it's left
+  // out here to avoid showing the same number twice on one screen.
+  const [dueReview, retentionQueue, inFlight, openTraining] = await Promise.all([
     supabase.from("documents").select("*", { count: "exact", head: true })
       .eq("status", "active").lte("next_review_at", nowIso),
     supabase.from("document_versions").select("*", { count: "exact", head: true })
@@ -78,14 +77,13 @@ async function QualityKpis() {
       .eq("status", "assigned"),
   ]);
   const cards = [
-    { label: "Open change controls", value: openChanges.count ?? 0, href: "/changes", icon: GitPullRequestArrow },
     { label: "Documents due for review", value: dueReview.count ?? 0, href: "/periodic", icon: CalendarClock },
     { label: "Retention-expiry queue", value: retentionQueue.count ?? 0, href: "/queues/destruction", icon: Flame },
     { label: "In-flight documents", value: inFlight.count ?? 0, href: "/library", icon: FileText },
     { label: "Incomplete training", value: openTraining.count ?? 0, href: "/training", icon: GraduationCap },
   ];
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((c) => (
         <StatCard key={c.label} label={c.label} value={c.value} href={c.href} icon={c.icon} />
       ))}

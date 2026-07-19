@@ -115,12 +115,16 @@ export const WIDGET_BY_KEY = new Map(WIDGET_CATALOGUE.map((w) => [w.key, w]));
 
 // Safe defaults — what each audience sees when QA hasn't designed anything yet.
 export const DEFAULT_LAYOUTS: Record<"admin" | "employee", WidgetConfig[]> = {
+  // Decision-focused default: usage_insights (busiest-screens analytics) dropped
+  // from the default as low-signal for quality decisions — still in the catalogue
+  // for QA to opt back in. training_pulse and copies_outstanding promoted in.
   admin: [
     { key: "quality_kpis", size: "full" },
     { key: "approvals_attention", size: "half" },
     { key: "periodic_worklist", size: "half" },
     { key: "department_overview", size: "full" },
-    { key: "usage_insights", size: "full" },
+    { key: "training_pulse", size: "half" },
+    { key: "copies_outstanding", size: "half" },
     { key: "recent_audit", size: "half" },
     { key: "storage_usage", size: "half" },
   ],

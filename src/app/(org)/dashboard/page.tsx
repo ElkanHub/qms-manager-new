@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardWidget, WidgetSkeleton, type WidgetCtx } from "./widgets";
+import { StatusStrip } from "./status-strip";
 import { DEFAULT_LAYOUTS, normalizeConfig, type WidgetConfig } from "./widget-catalogue";
 
 // D-DASHBOARD — the configurable dashboard. Everyone gets the layout QA
@@ -80,6 +81,11 @@ export default async function Dashboard({
           </>
         }
       />
+
+      {/* Persistent glance — always on, above the configurable grid. */}
+      <Suspense fallback={<div className="h-[76px] animate-pulse rounded-lg border bg-muted/30" />}>
+        <StatusStrip departmentId={departmentId} />
+      </Suspense>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {layout.map((w, i) => (
