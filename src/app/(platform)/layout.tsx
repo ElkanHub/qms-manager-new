@@ -15,9 +15,16 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
-      <AppSidebar plane="platform" orgName="Platform" roles={scopes} />
+      <AppSidebar
+        plane="platform"
+        orgName="Platform"
+        roles={scopes}
+        userName={user.full_name ?? user.email}
+        userSubtitle="Platform operator"
+        avatarUrl={user.avatar_url}
+      />
       <SidebarInset>
-        <AppHeader plane="platform" roles={scopes} name={user.full_name} email={user.email} />
+        <AppHeader plane="platform" roles={scopes} name={user.full_name} email={user.email} avatarUrl={user.avatar_url} />
         <div className="flex-1">{children}</div>
       </SidebarInset>
     </SidebarProvider>

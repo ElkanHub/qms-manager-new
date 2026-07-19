@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, Settings2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,9 +20,13 @@ import {
 export function UserMenu({
   name,
   email,
+  avatarUrl,
+  settingsHref,
 }: {
   name: string | null;
   email: string;
+  avatarUrl?: string | null;
+  settingsHref: string;
 }) {
   const router = useRouter();
   const initials = (name ?? email)
@@ -42,6 +46,7 @@ export function UserMenu({
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full" aria-label="Account menu">
           <Avatar className="size-8">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={name ?? email} />}
             <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
           </Avatar>
         </Button>
@@ -53,7 +58,7 @@ export function UserMenu({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings">
+          <Link href={settingsHref}>
             <Settings2 className="size-4" /> Settings
           </Link>
         </DropdownMenuItem>

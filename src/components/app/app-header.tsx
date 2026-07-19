@@ -13,6 +13,7 @@ export function AppHeader({
   roles,
   name,
   email,
+  avatarUrl,
   breadcrumbLabels,
   moduleStates,
 }: {
@@ -20,9 +21,11 @@ export function AppHeader({
   roles: string[];
   name: string | null;
   email: string;
+  avatarUrl?: string | null;
   breadcrumbLabels?: Record<string, string>;
   moduleStates?: Record<string, boolean>;
 }) {
+  const settingsHref = plane === "platform" ? "/platform/settings" : "/settings";
   return (
     // Brand-colored bar (navy→blue gradient, constant across themes). The `dark`
     // class flips the subtree to the dark token set so every control reads as
@@ -39,7 +42,7 @@ export function AppHeader({
       <div className="ml-auto flex items-center gap-2">
         <CommandMenu plane={plane} roles={roles} moduleStates={moduleStates} />
         <ModeToggle />
-        <UserMenu name={name} email={email} />
+        <UserMenu name={name} email={email} avatarUrl={avatarUrl} settingsHref={settingsHref} />
       </div>
     </header>
   );
