@@ -1,4 +1,4 @@
-# QMS Manager — Platform Foundation
+# QMS Manager — Platform Foundation.
 
 The GxP-compliant substrate every later module (document-control core included)
 plugs into. Built strictly from `FOUNDATIONS.md` and `FOUNDATION_BUILD_PLAN.md`,
