@@ -3,27 +3,28 @@
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SectionCard } from "@/components/app/section-card";
 import { PageHeader } from "@/components/app/page-header";
 import { SignatureCapture } from "@/components/app/signature-capture";
+import { AvatarUpload } from "@/components/app/avatar-upload";
+import { SignOutButton } from "@/components/app/sign-out-button";
+import { SoundToggle } from "@/components/app/sound-toggle";
 import { UserCircle, PenTool, SlidersHorizontal, ShieldCheck } from "lucide-react";
 import { orgNav, platformNav, type NavItem } from "@/components/app/nav";
-import { SignOutButton } from "../account/SignOutButton";
-import { SoundToggle } from "../account/sound-toggle";
 
-// S-SETTINGS — a user's personal hub, tabbed. Account details are the first tab
-// (previously the standalone /account page). Signature is org-only; the
-// Administration tab is a plane-aware link grid for admins, sourced from nav.ts
-// so it stays in lock-step with the sidebar. No self-service role changes.
+// S-SETTINGS — a user's personal hub, tabbed and rendered INSIDE the plane shell
+// (sidebar + brand header) for both org and platform users. Account details are
+// the first tab; Signature is org-only; the Administration tab is a plane-aware
+// link grid for admins, sourced from nav.ts so it stays in step with the sidebar.
 export function SettingsClient({
   name,
   email,
   department,
   roles,
   plane,
+  avatarUrl,
   initialSignature,
   soundEnabled,
 }: {
@@ -32,22 +33,15 @@ export function SettingsClient({
   department: string;
   roles: string[];
   plane: "org" | "platform";
+  avatarUrl: string | null;
   initialSignature: string | null;
   soundEnabled: boolean;
 }) {
-  const initials = name
-    .split(/[\s@.]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-
   const canSee = (item: NavItem) => !item.roles || item.roles.some((r) => roles.includes(r));
   const isOrgAdmin = roles.includes("qa") || roles.includes("org_admin");
 
-  // Admin destinations, plane-aware and role-filtered — reused verbatim from the
-  // sidebar's nav definition so there's one source of truth.
+  // Admin destinations, plane-aware and role-filtered — reused from the sidebar's
+  // nav definition so there's one source of truth.
   const adminGroups =
     plane === "platform"
       ? platformNav.filter((g) => g.label === "Operations")
@@ -87,17 +81,14 @@ export function SettingsClient({
         <TabsContent value="account" className="mt-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarFallback>{initials || "?"}</AvatarFallback>
-                </Avatar>
-                <div className="space-y-1">
-                  <CardTitle>{name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{email}</p>
-                </div>
-              </div>
+              <CardTitle>{name}</CardTitle>
+              <p className="text-sm text-muted-foreground">{email}</p>
             </CardHeader>
             <CardContent className="space-y-4">
+              <AvatarUpload name={name} initialAvatar={avatarUrl} />
+
+              <Separator />
+
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Department</span>
                 <span className="font-medium">{department}</span>

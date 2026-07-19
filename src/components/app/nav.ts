@@ -100,7 +100,6 @@ export const orgNav: NavGroup[] = [
 
 export const orgFooterNav: NavItem[] = [
   { label: "Flag this", href: "/feedback", icon: Flag },
-  { label: "Settings", href: "/settings", icon: Settings2 },
 ];
 
 export const platformNav: NavGroup[] = [
@@ -146,6 +145,7 @@ export const routeLabels: Record<string, string> = {
   "/feedback": "Flag this",
   "/account": "Account",
   "/settings": "Settings",
+  "/platform/settings": "Settings",
   "/org": "Administration",
   "/org/users": "Users & roles",
   "/org/dashboards": "Dashboard design",
