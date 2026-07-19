@@ -83,7 +83,7 @@ export default async function Dashboard({
       />
 
       {/* Persistent glance — always on, above the configurable grid. */}
-      <Suspense fallback={<div className="h-[76px] animate-pulse rounded-lg border bg-muted/30" />}>
+      <Suspense fallback={<div className="h-10 animate-pulse rounded-lg border bg-muted/30" />}>
         <StatusStrip departmentId={departmentId} />
       </Suspense>
 

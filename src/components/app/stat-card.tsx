@@ -16,13 +16,17 @@ export function StatCard({
   icon?: LucideIcon;
 }) {
   return (
-    <Link href={href} className="group">
-      <Card className="p-5 transition-colors group-hover:border-ring">
-        <div className="flex items-start justify-between">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          {Icon && <Icon className="size-4 text-muted-foreground" aria-hidden />}
+    // h-full + flex column keeps every card the same height in its grid row; the
+    // label reserves two lines (clamped) and the value is pinned to the bottom,
+    // so a long label can never push this card's value out of line with its
+    // siblings.
+    <Link href={href} className="group block h-full">
+      <Card className="flex h-full flex-col p-5 transition-colors group-hover:border-ring">
+        <div className="flex items-start justify-between gap-2">
+          <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">{label}</p>
+          {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
         </div>
-        <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
+        <p className="mt-auto pt-2 text-3xl font-semibold tabular-nums">{value}</p>
       </Card>
     </Link>
   );

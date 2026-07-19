@@ -1,5 +1,6 @@
+import { Fragment } from "react";
 import Link from "next/link";
-import { Activity, FilePen, GitPullRequestArrow, AlertTriangle, type LucideIcon } from "lucide-react";
+import { FilePen, GitPullRequestArrow, AlertTriangle, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 // D-DASHBOARD status strip — a persistent glance at the top of the dashboard,
@@ -37,8 +38,17 @@ export async function StatusStrip({ departmentId }: { departmentId: string | nul
 
   const onlineNow = new Set((actors.data ?? []).map((r) => r.actor_email).filter(Boolean)).size;
 
-  const cells: { label: string; value: number; href: string; icon: LucideIcon; alert?: boolean }[] = [
-    { label: "Online now", value: onlineNow, href: "/audit", icon: Activity },
+  // `online` renders a pulsing dot instead of an icon; `alert` colours the number
+  // when there's a risk to act on.
+  const cells: {
+    label: string;
+    value: number;
+    href: string;
+    icon?: LucideIcon;
+    online?: boolean;
+    alert?: boolean;
+  }[] = [
+    { label: "Online now", value: onlineNow, href: "/audit", online: true },
     { label: "SOPs updated this week", value: updatedWeek.count ?? 0, href: "/library", icon: FilePen },
     { label: "Open change controls", value: openChanges.count ?? 0, href: "/changes", icon: GitPullRequestArrow },
     {
@@ -50,25 +60,24 @@ export async function StatusStrip({ departmentId }: { departmentId: string | nul
     },
   ];
 
+  // A thin inline strip (old project's principles): items flow and wrap with
+  // gaps, the number sits inline with its label, and the vertical dividers hide
+  // on mobile so a wrapped layout never leaves a dangling separator.
   return (
-    <div className="grid grid-cols-2 divide-x divide-y rounded-lg border sm:grid-cols-4 sm:divide-y-0">
-      {cells.map((c) => (
-        <Link
-          key={c.label}
-          href={c.href}
-          className="flex items-center gap-3 p-4 transition-colors hover:bg-muted/50"
-        >
-          <c.icon
-            className={`size-5 shrink-0 ${c.alert ? "text-status-blocked" : "text-muted-foreground"}`}
-            aria-hidden
-          />
-          <span className="min-w-0">
-            <span className={`block text-2xl font-semibold tabular-nums ${c.alert ? "text-status-blocked" : ""}`}>
-              {c.value}
-            </span>
-            <span className="block truncate text-xs text-muted-foreground">{c.label}</span>
-          </span>
-        </Link>
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-muted/40 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {cells.map((c, i) => (
+        <Fragment key={c.label}>
+          {i > 0 && <div className="hidden h-4 w-px bg-border sm:block" aria-hidden />}
+          <Link href={c.href} className="flex items-center gap-2 transition-colors hover:text-foreground">
+            {c.online ? (
+              <span className="size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" aria-hidden />
+            ) : (
+              c.icon && <c.icon className={`size-3.5 shrink-0 ${c.alert ? "text-status-blocked" : ""}`} aria-hidden />
+            )}
+            <span className={`tabular-nums ${c.alert ? "text-status-blocked" : "text-foreground"}`}>{c.value}</span>
+            <span>{c.label}</span>
+          </Link>
+        </Fragment>
       ))}
     </div>
   );
