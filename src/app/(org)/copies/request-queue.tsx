@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -45,8 +46,9 @@ function IssueButton({ requestId }: { requestId: string }) {
 // C-QA-ISSUE — the incoming copy requests, each with everything QA needs to
 // decide on one line: what, which type, where to, how many, and why.
 export function RequestQueue({ rows }: { rows: RequestRow[] }) {
+  const [listRef] = useAutoAnimate();
   return (
-    <ul className="divide-y">
+    <ul ref={listRef} className="divide-y">
       {rows.map((r) => (
         <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
           <div className="min-w-0 flex-1">

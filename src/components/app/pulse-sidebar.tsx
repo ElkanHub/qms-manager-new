@@ -254,7 +254,7 @@ function PulseFeed({
       ) : (
         <ul className="space-y-1.5">
           {items.map((n) => (
-            <li key={n.id}>
+            <li key={n.id} className="animate-in fade-in slide-in-from-right-4 duration-300">
               <button
                 type="button"
                 onClick={async () => {
@@ -313,7 +313,7 @@ function BroadcastFeed({
       ) : (
         <ul className="space-y-2">
           {items.map((b) => (
-            <li key={b.id} className={`rounded-md border p-3 ${!b.acked && !b.mine ? "border-primary/30 bg-primary/5" : ""}`}>
+            <li key={b.id} className={`animate-in fade-in slide-in-from-right-4 duration-300 rounded-md border p-3 ${!b.acked && !b.mine ? "border-primary/30 bg-primary/5" : ""}`}>
               <div className="flex items-start gap-2">
                 <Megaphone className="mt-0.5 size-4 shrink-0 text-primary" />
                 <div className="min-w-0 flex-1">
@@ -547,7 +547,7 @@ function ThreadView({
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
+          <div key={m.id} className={`flex animate-in fade-in slide-in-from-top-2 duration-300 ${m.mine ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                 m.mine ? "bg-primary text-primary-foreground" : "bg-muted"

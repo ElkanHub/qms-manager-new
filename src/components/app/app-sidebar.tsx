@@ -148,7 +148,7 @@ export function AppSidebar({
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
                           tooltip={`${item.label} — not in your plan`}
-                          className="opacity-50"
+                          className="upsell-shimmer opacity-60"
                           onClick={() => nudge(item.label)}
                         >
                           <item.icon />
@@ -166,7 +166,7 @@ export function AppSidebar({
                           <span>{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
-                      {count ? <SidebarMenuBadge>{count}</SidebarMenuBadge> : null}
+                      {count ? <BumpBadge count={count} /> : null}
                     </SidebarMenuItem>
                   );
                 })}
@@ -218,4 +218,22 @@ export function AppSidebar({
       <SidebarRail />
     </Sidebar>
   );
+}
+
+// A queue count badge that bumps when the number rises — new work arriving pulls
+// the eye to the queue that just gained an item. Bumps only on increase (a
+// decrease is work getting done — no need to shout). Purely presentational.
+function BumpBadge({ count }: { count: number }) {
+  const prev = useRef(count);
+  const [bump, setBump] = useState(false);
+  useEffect(() => {
+    if (count > prev.current) {
+      setBump(true);
+      const t = setTimeout(() => setBump(false), 450);
+      prev.current = count;
+      return () => clearTimeout(t);
+    }
+    prev.current = count;
+  }, [count]);
+  return <SidebarMenuBadge className={bump ? "animate-bump" : undefined}>{count}</SidebarMenuBadge>;
 }

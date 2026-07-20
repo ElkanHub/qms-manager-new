@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Activity, FilePen, GitPullRequestArrow, AlertTriangle, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { AnimatedCount } from "@/components/app/animated-count";
 
 // D-DASHBOARD status strip — a persistent glance at the top of the dashboard,
 // distinct from the configurable widget grid below it. Four live numbers a
@@ -59,12 +60,12 @@ export async function StatusStrip({ departmentId }: { departmentId: string | nul
           className="flex items-center gap-3 p-4 transition-colors hover:bg-muted/50"
         >
           <c.icon
-            className={`size-5 shrink-0 ${c.alert ? "text-status-blocked" : "text-muted-foreground"}`}
+            className={`size-5 shrink-0 ${c.alert ? "text-status-blocked animate-soft-pulse" : "text-muted-foreground"}`}
             aria-hidden
           />
           <span className="min-w-0">
             <span className={`block text-2xl font-semibold tabular-nums ${c.alert ? "text-status-blocked" : ""}`}>
-              {c.value}
+              <AnimatedCount value={c.value} />
             </span>
             <span className="block truncate text-xs text-muted-foreground">{c.label}</span>
           </span>

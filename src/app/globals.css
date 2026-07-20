@@ -194,4 +194,80 @@
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply rounded-full bg-slate-200 transition-colors hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700;
   }
+
+  /* ==========================================================================
+     Motion layer (ANIMATION_OPPORTUNITIES.md / issue #53). Meaningful, brief
+     UI motion — success feedback, live-work attention, feature interest. Every
+     effect animates transform/opacity only and is disabled under
+     prefers-reduced-motion (guard at the end). Entrances reuse the built-in
+     tailwindcss-animate utilities (animate-in fade-in slide-in-*); the custom
+     keyframes below cover what those don't.
+     ========================================================================== */
+
+  /* 1.1/1.2 — success check that draws itself (SVG stroke). */
+  @keyframes qms-check-draw {
+    to { stroke-dashoffset: 0; }
+  }
+  .animate-check-draw {
+    stroke-dasharray: 26;
+    stroke-dashoffset: 26;
+    animation: qms-check-draw 0.38s ease-out 0.05s forwards;
+  }
+
+  /* 2.1 — badge bump when a queue count rises (new work arrived). */
+  @keyframes qms-bump {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.35); }
+    60% { transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+  .animate-bump { animation: qms-bump 0.4s ease-out; }
+
+  /* 2.3/3.4 — low-key resting pulse for a present-but-not-alarming signal. */
+  @keyframes qms-soft-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .animate-soft-pulse { animation: qms-soft-pulse 2.4s ease-in-out infinite; }
+
+  /* 1.2 — signature seal: a considered scale-settle for the GxP sign moment. */
+  @keyframes qms-seal {
+    0% { transform: scale(0.6); opacity: 0; }
+    60% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .animate-seal { animation: qms-seal 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+  /* 3.1 — hover sheen sweep for greyed "upsell" sidebar rows (hover only). */
+  .upsell-shimmer { position: relative; overflow: hidden; }
+  .upsell-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transform: translateX(-130%);
+    background: linear-gradient(
+      100deg,
+      transparent 25%,
+      hsl(var(--foreground) / 0.09) 50%,
+      transparent 75%
+    );
+  }
+  .upsell-shimmer:hover::after {
+    animation: qms-shimmer 1.15s ease-out;
+  }
+  @keyframes qms-shimmer {
+    to { transform: translateX(130%); }
+  }
+
+  /* Accessibility: honour reduced-motion for every effect in this layer and the
+     tailwindcss-animate entrances. Elements settle to their resting state. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-check-draw { stroke-dashoffset: 0; animation: none; }
+    .animate-bump,
+    .animate-soft-pulse,
+    .animate-seal { animation: none; }
+    .upsell-shimmer:hover::after { animation: none; }
+    .animate-in { animation: none !important; }
+  }
 }
