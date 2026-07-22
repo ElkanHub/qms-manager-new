@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollText } from "lucide-react";
 import { columns, type AuditRow } from "./columns";
 import { ExportMenu } from "./export-menu";
+import { platformEmailSet, maskActor } from "@/lib/audit-actor";
 
 // S-AUDIT — the read-only, sortable, filterable audit viewer. RLS scopes what's
 // visible: org QA sees only their org's trail; platform admins reach a tenant's
@@ -47,10 +48,18 @@ export default async function AuditViewer({
 
   const qs = new URLSearchParams(f as Record<string, string>).toString();
 
+  // Privacy: mask platform-plane actors when an ORG user is viewing — the org
+  // sees "Platform", never the platform person's email. A platform admin viewing
+  // a tenant's trail through an open gate still sees real addresses.
+  const platform =
+    user.plane === "org"
+      ? await platformEmailSet(supabase, (rows ?? []).map((r) => r.actor_email))
+      : new Set<string>();
+
   const data: AuditRow[] = (rows ?? []).map((r) => ({
     id: String(r.id),
     time: r.occurred_at,
-    actor: r.actor_email ?? "System (automatic)",
+    actor: maskActor(r.actor_email, platform),
     action: r.action,
     entityType: r.entity_type ?? "",
     entityId: r.entity_id ? String(r.entity_id) : null,

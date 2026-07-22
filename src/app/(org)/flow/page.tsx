@@ -14,12 +14,11 @@ export default async function FlowMap() {
   if (!(roles.includes("qa") || roles.includes("org_admin"))) redirect("/dashboard");
 
   const supabase = await createClient();
-  const { data: mod } = await supabase
+  const { data: mods } = await supabase
     .from("tenant_modules")
-    .select("enabled")
-    .eq("module_key", "flow_map")
-    .maybeSingle();
-  const moduleOn = mod?.enabled ?? false;
+    .select("module_key, enabled");
+  const moduleStates = Object.fromEntries((mods ?? []).map((m) => [m.module_key, m.enabled === true]));
+  const moduleOn = moduleStates["flow_map"] === true;
 
   // SOP list for the search/dropdown (tenant-scoped by RLS). Effective docs first,
   // then by number/title so the list reads the way people think about it.
@@ -30,7 +29,7 @@ export default async function FlowMap() {
     .order("title", { ascending: true });
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-2">
       <PageHeader
         title="Document flow map"
         description="Search a document and see exactly where it sits in the document-control flow — from intake through effective, change control and retirement. Every look-up is recorded on the audit trail."
@@ -41,7 +40,7 @@ export default async function FlowMap() {
           detail="This visual is controlled at the platform level. Nothing here is available until it is enabled for your organization."
         />
       ) : (
-        <FlowExplorer documents={docs ?? []} />
+        <FlowExplorer documents={docs ?? []} moduleStates={moduleStates} />
       )}
     </div>
   );
