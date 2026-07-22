@@ -78,7 +78,7 @@ async function QualityKpis() {
       .eq("status", "assigned"),
   ]);
   const cards = [
-    { label: "Documents due for review", value: dueReview.count ?? 0, href: "/periodic", icon: CalendarClock },
+    { label: "Docs due for review", value: dueReview.count ?? 0, href: "/periodic", icon: CalendarClock },
     { label: "Retention-expiry queue", value: retentionQueue.count ?? 0, href: "/queues/destruction", icon: Flame },
     { label: "In-flight documents", value: inFlight.count ?? 0, href: "/library", icon: FileText },
     { label: "Incomplete training", value: openTraining.count ?? 0, href: "/training", icon: GraduationCap },
