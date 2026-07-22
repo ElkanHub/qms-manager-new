@@ -6,6 +6,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { platformEmailSet, maskActor } from "@/lib/audit-actor";
 import { SectionCard } from "@/components/app/section-card";
 import { StatCard } from "@/components/app/stat-card";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -277,6 +278,8 @@ async function RecentAudit() {
     .select("id, action, actor_email, occurred_at")
     .order("id", { ascending: false })
     .limit(8);
+  // Privacy: this is an org surface — platform actors show as "Platform".
+  const platform = await platformEmailSet(supabase, (data ?? []).map((e) => e.actor_email));
   return (
     <SectionCard
       title="Recent activity"
@@ -289,7 +292,7 @@ async function RecentAudit() {
             <li key={e.id} className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate">
                 <span className="font-mono text-xs">{e.action}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{e.actor_email}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{maskActor(e.actor_email, platform)}</span>
               </span>
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {new Date(e.occurred_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}

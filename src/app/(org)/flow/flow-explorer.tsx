@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PanelRightClose, PanelRightOpen, Loader2, Check } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Loader2, Check, Lock, LockOpen } from "lucide-react";
 import {
   Command,
   CommandInput,
@@ -17,33 +17,40 @@ import { inspectFlow, type FlowInspect } from "./actions";
 
 type Doc = { id: string; document_number: string | null; title: string; status: string };
 
+// A branch module that hangs off a stage (a switchboard seam). Shown always; when
+// the tenant has it off it greys out with a lock and the main flow passes it by.
+type Seam = { label: string; hint: string; moduleKey: string };
+
 // The document-control spine, mirroring DOCS/core_build_state_with_seams.png.
 // Each stage names the document.status values that land on it; `seam` is the
-// module/coupling that hangs off that stage (shown as context, like the PNG).
+// switchboard module that branches off that stage.
 const STAGES: {
   key: string;
   label: string;
   hint: string;
-  accent: string; // left-edge tone, echoing the reference diagram's palette
+  accent: string; // dot tone, echoing the reference diagram's palette
   statuses: string[];
-  seam?: { label: string; hint: string };
+  seam?: Seam;
 }[] = [
   { key: "intake", label: "Intake", hint: "Authored as a draft — the one door in", accent: "bg-violet-500",
     statuses: ["draft"] },
   { key: "review", label: "Review & approval", hint: "HOD endorsement · QA review · segregation of duties", accent: "bg-violet-500",
     statuses: ["in_review"] },
-  { key: "effective", label: "Effective — training seam", hint: "Approved; going live", accent: "bg-amber-500",
-    statuses: ["pending_training", "scheduled"], seam: { label: "Training", hint: "Default: no training required" } },
+  { key: "effective", label: "Effective", hint: "Approved; going live", accent: "bg-amber-500",
+    statuses: ["pending_training", "scheduled"],
+    seam: { label: "Training", hint: "Trainees certified before go-live", moduleKey: "training" } },
   { key: "live", label: "Read surface & Library", hint: "Live, effective, readable tenant-wide", accent: "bg-emerald-500",
-    statuses: ["active"], seam: { label: "Periodic review", hint: "Effectiveness dates, if enabled" } },
+    statuses: ["active"],
+    seam: { label: "Periodic review", hint: "Scheduled effectiveness reviews", moduleKey: "periodic_review" } },
   { key: "change", label: "Under change control", hint: "Locked while a change is processed", accent: "bg-amber-500",
-    statuses: ["locked_in_cc"], seam: { label: "Reconcile · copies", hint: "Default: nothing to reconcile" } },
+    statuses: ["locked_in_cc"],
+    seam: { label: "Copy reconciliation", hint: "Issued copies accounted for", moduleKey: "controlled_copies" } },
   { key: "retire", label: "Supersede → retain", hint: "Superseded or retired; retention → destruction", accent: "bg-slate-400",
     statuses: ["retired"] },
 ];
 
 // Friendly names for the 13 change-control sub-stages (collapsed to one node,
-// named in the context panel — the decision from Q2).
+// named in the context panel).
 const CC_LABELS: Record<string, string> = {
   submitted: "Submitted — awaiting QA screening",
   clarification_requested: "Clarification requested",
@@ -87,7 +94,41 @@ function narrative(r: FlowInspect): string {
   }
 }
 
-export function FlowExplorer({ documents }: { documents: Doc[] }) {
+// A stage's branch module: always drawn; greyed + locked when the tenant has it off.
+function SeamBranch({ seam, enabled, current }: { seam: Seam; enabled: boolean; current: boolean }) {
+  return (
+    <div className="flex items-center">
+      {/* the tap into the main flow */}
+      <span className={cn("h-0.5 w-6 shrink-0", enabled ? "bg-border" : "border-t border-dashed border-border")} />
+      <div
+        className={cn(
+          "flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-left",
+          !enabled && "border-dashed opacity-55",
+          enabled && current && "border-primary/50 bg-primary/5",
+        )}
+        title={enabled ? `${seam.label} — in use` : `${seam.label} — not enabled for your organization`}
+      >
+        {enabled ? (
+          <LockOpen className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+        ) : (
+          <Lock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        )}
+        <div className="min-w-0">
+          <div className="text-xs font-medium">{seam.label}</div>
+          <div className="text-[10px] text-muted-foreground">{enabled ? seam.hint : "Not in use"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function FlowExplorer({
+  documents,
+  moduleStates,
+}: {
+  documents: Doc[];
+  moduleStates: Record<string, boolean>;
+}) {
   const [selected, setSelected] = useState<Doc | null>(null);
   const [result, setResult] = useState<FlowInspect | null>(null);
   const [loading, setLoading] = useState(false);
@@ -155,62 +196,68 @@ export function FlowExplorer({ documents }: { documents: Doc[] }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        {/* The diagram */}
+        {/* The flowchart */}
         <div className="rounded-lg border bg-card p-6">
-          {loading && (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Locating the document…
-            </p>
-          )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          {!loading && !error && !result && (
-            <p className="text-sm text-muted-foreground">
-              Pick a document above to trace its position through the flow.
-            </p>
-          )}
+          <div className="mb-6 min-h-5 text-center text-sm">
+            {loading && (
+              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Locating the document…
+              </span>
+            )}
+            {error && <span className="text-destructive">{error}</span>}
+            {!loading && !error && !result && (
+              <span className="text-muted-foreground">
+                Pick a document above to trace its position through the flow.
+              </span>
+            )}
+            {!loading && !error && result && (
+              <span className="font-mono text-xs text-muted-foreground">
+                {result.document_number ?? "—"} · <span className="text-foreground">{result.title}</span>
+              </span>
+            )}
+          </div>
 
-          <ol className="mx-auto flex max-w-md flex-col">
+          <ol className="mx-auto flex max-w-2xl flex-col items-stretch">
             {STAGES.map((stage, i) => {
               const state = active === -1 ? "idle" : i < active ? "done" : i === active ? "current" : "upcoming";
+              const seamEnabled = stage.seam ? moduleStates[stage.seam.moduleKey] === true : false;
               return (
                 <li key={stage.key}>
-                  <div
-                    className={cn(
-                      "relative flex items-start gap-3 rounded-md border p-3 transition-colors",
-                      state === "current" && "border-primary bg-primary/5 shadow-sm ring-1 ring-primary",
-                      state === "upcoming" && "opacity-45",
-                      state === "idle" && "opacity-70",
-                    )}
-                  >
-                    <span className={cn("mt-1 h-8 w-1 shrink-0 rounded-full", stage.accent,
-                      state === "upcoming" && "opacity-40")} />
-                    <div className="min-w-0 flex-1">
+                  {/* Row: [left spacer] [centred main node] [branch] — the grid keeps
+                      the spine centred whether or not a branch is present. */}
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+                    <span />
+                    <div
+                      className={cn(
+                        "flex w-64 flex-col items-center rounded-lg border px-4 py-3 text-center transition-colors",
+                        state === "current" && "border-primary bg-primary/5 shadow-sm ring-1 ring-primary",
+                        state === "upcoming" && "opacity-45",
+                        state === "idle" && "opacity-75",
+                      )}
+                    >
                       <div className="flex items-center gap-2">
+                        <span className={cn("size-2 rounded-full", stage.accent, state === "upcoming" && "opacity-40")} />
                         <span className="font-medium">{stage.label}</span>
                         {state === "current" && <Badge className="text-[10px]">Here now</Badge>}
                         {state === "done" && <Check className="size-3.5 text-primary" />}
                       </div>
-                      <p className="text-xs text-muted-foreground">{stage.hint}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{stage.hint}</p>
                     </div>
-                    {stage.seam && (
-                      <div className={cn(
-                        "hidden shrink-0 rounded border border-dashed px-2 py-1 text-right sm:block",
-                        state === "current" ? "border-primary/50 text-foreground" : "text-muted-foreground",
-                      )}>
-                        <div className="text-xs font-medium">{stage.seam.label}</div>
-                        <div className="text-[10px]">{stage.seam.hint}</div>
-                      </div>
-                    )}
+                    <div className="flex justify-start">
+                      {stage.seam && (
+                        <SeamBranch seam={stage.seam} enabled={seamEnabled} current={state === "current"} />
+                      )}
+                    </div>
                   </div>
-                  {/* Connector to the next stage; animates only on the traversed path. */}
+
+                  {/* Centred connector to the next stage; the traversed path flows. */}
                   {i < STAGES.length - 1 && (
-                    <div className="flex h-8 justify-start pl-6">
+                    <div className="grid grid-cols-[1fr_auto_1fr]">
+                      <span />
                       <span
-                        className={cn(
-                          "w-1 rounded-full",
-                          active !== -1 && i < active ? "flowmap-live" : "bg-border",
-                        )}
+                        className={cn("mx-auto h-8 w-1 rounded-full", active !== -1 && i < active ? "flowmap-live" : "bg-border")}
                       />
+                      <span />
                     </div>
                   )}
                 </li>
@@ -218,8 +265,11 @@ export function FlowExplorer({ documents }: { documents: Doc[] }) {
             })}
           </ol>
 
-          <div className="mt-6 rounded-md bg-muted/50 px-3 py-2 text-center text-xs text-muted-foreground">
-            Audit spine — every step above is recorded on the tamper-evident trail.
+          <div className="mx-auto mt-4 flex max-w-2xl flex-col items-center">
+            <span className="h-8 w-1 rounded-full bg-border" />
+            <div className="w-full rounded-md bg-muted/50 px-3 py-2 text-center text-xs text-muted-foreground">
+              Audit spine — every step above is recorded on the tamper-evident trail.
+            </div>
           </div>
         </div>
 
