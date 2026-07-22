@@ -12,6 +12,7 @@ import {
   CalendarClock,
   Copy,
   ScrollText,
+  Workflow,
   Grid3x3,
   Hash,
   SlidersHorizontal,
@@ -80,6 +81,7 @@ export const orgNav: NavGroup[] = [
     label: "Quality system",
     items: [
       { label: "Audit trail", href: "/audit", icon: ScrollText },
+      { label: "Flow map", href: "/flow", icon: Workflow, roles: ["qa", "org_admin"], moduleKey: "flow_map" },
       { label: "Classification matrix", href: "/org/classify", icon: Grid3x3, roles: ["qa"] },
       { label: "Numbering", href: "/org/numbering", icon: Hash, roles: ["qa"], moduleKey: "numbering" },
       { label: "Retention & modules", href: "/org/modules", icon: SlidersHorizontal, roles: ["qa", "org_admin"] },
@@ -142,6 +144,7 @@ export const routeLabels: Record<string, string> = {
   "/org/branding": "Branding",
   "/platform/ai-gateway": "AI gateway",
   "/audit": "Audit trail",
+  "/flow": "Flow map",
   "/feedback": "Flag this",
   "/account": "Account",
   "/settings": "Settings",
@@ -184,5 +187,6 @@ export const routeGroup: Record<string, string> = {
   "/periodic": "Queues",
   "/copies": "Queues",
   "/audit": "Quality system",
+  "/flow": "Quality system",
   "/org/import": "Administration",
 };
