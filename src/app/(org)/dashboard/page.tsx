@@ -89,7 +89,15 @@ export default async function Dashboard({
 
       <div className="grid gap-4 lg:grid-cols-2">
         {layout.map((w, i) => (
-          <div key={`${w.key}-${i}`} className={w.size === "full" ? "lg:col-span-2" : undefined}>
+          <div
+            key={`${w.key}-${i}`}
+            // Staggered rise-in as the grid assembles — reads as "alive," not
+            // "loading." Delay is capped so late widgets don't visibly lag.
+            className={`animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500 ${
+              w.size === "full" ? "lg:col-span-2" : ""
+            }`}
+            style={{ animationDelay: `${Math.min(i * 60, 400)}ms` }}
+          >
             <Suspense fallback={<WidgetSkeleton size={w.size ?? "half"} />}>
               <DashboardWidget k={w.key} ctx={ctx} />
             </Suspense>

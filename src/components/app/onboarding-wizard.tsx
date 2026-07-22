@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckDraw } from "@/components/app/check-draw";
 import { SignatureCapture } from "@/components/app/signature-capture";
 import { AvatarUpload } from "@/components/app/avatar-upload";
 import type { OnbStep, OnbField } from "@/lib/onboarding-defaults";
@@ -94,7 +95,10 @@ export function OnboardingWizard({
           direction === "fwd" ? "slide-in-from-right-6" : "slide-in-from-left-6"
         }`}
       >
-        <h2 className="mb-1 text-lg font-semibold">{step.title}</h2>
+        <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold">
+          {last && <CheckDraw className="size-6 text-status-effective animate-seal" />}
+          {step.title}
+        </h2>
         {step.signature ? (
           <SignatureCapture
             fullName={answers.full_name ?? ""}

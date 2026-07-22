@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { AnimatedCount } from "@/components/app/animated-count";
 
 // Dashboard stat tile (UI_BUILD_PLAN §7.2). Big tabular value, label, icon; the
 // whole card links onward with a subtle ring on hover.
@@ -22,7 +23,9 @@ export function StatCard({
           <p className="text-sm text-muted-foreground">{label}</p>
           {Icon && <Icon className="size-4 text-muted-foreground" aria-hidden />}
         </div>
-        <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
+        <p className="mt-2 text-3xl font-semibold tabular-nums">
+          {typeof value === "number" ? <AnimatedCount value={value} /> : value}
+        </p>
       </Card>
     </Link>
   );

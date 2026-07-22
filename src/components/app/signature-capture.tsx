@@ -6,6 +6,7 @@ import { Check, Eraser, Loader2, QrCode, RefreshCw, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InitialsSignature } from "@/components/app/initials-signature";
+import { CheckDraw } from "@/components/app/check-draw";
 import {
   saveSignature,
   createSignatureQr,
@@ -30,6 +31,7 @@ export function SignatureCapture({
   onCaptured?: () => void;
 }) {
   const [captured, setCaptured] = useState<string | null>(initialSignature ?? null);
+  const [sealed, setSealed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function persist(image: string, source: "drawn" | "uploaded") {
@@ -43,6 +45,7 @@ export function SignatureCapture({
       if (res.ok) {
         setCaptured(image);
         onCaptured?.();
+        setSealed(true);
         toast.success("Signature saved.");
       } else toast.error(res.error);
     });
@@ -73,6 +76,7 @@ export function SignatureCapture({
             onCaptured={() => {
               setCaptured("phone");
               onCaptured?.();
+              setSealed(true);
             }}
           />
         </TabsContent>
@@ -84,7 +88,14 @@ export function SignatureCapture({
 
       <div className="flex flex-wrap items-end gap-4">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Your signature</p>
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            Your signature
+            {sealed && (
+              <span className="inline-flex animate-seal items-center justify-center rounded-full bg-status-effective/15 p-1.5">
+                <CheckDraw className="size-5 text-status-effective" />
+              </span>
+            )}
+          </p>
           {captured && captured !== "phone" ? (
             // eslint-disable-next-line @next/next/no-img-element -- small data URL
             <img

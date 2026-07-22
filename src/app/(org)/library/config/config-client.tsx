@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
@@ -40,11 +41,12 @@ export function CategoriesManager({
 }) {
   const [newName, setNewName] = useState("");
   const { pending, run } = useAct();
+  const [listRef] = useAutoAnimate();
 
   return (
     <div className="space-y-3">
       {categories.length > 0 && (
-        <ul className="divide-y">
+        <ul ref={listRef} className="divide-y">
           {categories.map((c) => (
             <CategoryRow key={c.id} category={c} />
           ))}
@@ -115,8 +117,9 @@ export function AccessQueue({
 }: {
   rows: { id: string; document: string; requester: string; purpose: string; at: string }[];
 }) {
+  const [listRef] = useAutoAnimate();
   return (
-    <ul className="divide-y">
+    <ul ref={listRef} className="divide-y">
       {rows.map((r) => (
         <AccessRow key={r.id} r={r} />
       ))}
@@ -181,8 +184,9 @@ export function ActiveGrants({
 }: {
   rows: { id: string; document: string; requester: string; until: string }[];
 }) {
+  const [listRef] = useAutoAnimate();
   return (
-    <ul className="divide-y">
+    <ul ref={listRef} className="divide-y">
       {rows.map((g) => (
         <li key={g.id} className="flex flex-wrap items-center gap-3 py-2.5">
           <div className="min-w-0 flex-1">
@@ -214,8 +218,9 @@ export function LockedDocs({
   rows: { documentId: string; document: string; reason: string; since: string }[];
 }) {
   const { pending, run } = useAct();
+  const [listRef] = useAutoAnimate();
   return (
-    <ul className="divide-y">
+    <ul ref={listRef} className="divide-y">
       {rows.map((l) => (
         <li key={l.documentId} className="flex flex-wrap items-center gap-3 py-2.5">
           <div className="min-w-0 flex-1">

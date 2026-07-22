@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckDraw } from "@/components/app/check-draw";
 import { pingBadges } from "@/lib/badge-refresh";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -53,7 +54,10 @@ export function ActionForm({
         </Alert>
       )}
       {state && state.ok && (
-        <p className="break-all text-sm text-status-effective">{state.message ?? "Done."}</p>
+        <p className="flex items-center gap-1.5 break-all text-sm text-status-effective">
+          <CheckDraw className="size-4 shrink-0" />
+          {state.message ?? "Done."}
+        </p>
       )}
     </form>
   );

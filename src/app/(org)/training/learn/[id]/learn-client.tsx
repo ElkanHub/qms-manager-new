@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { fetchAssessment, saveProgress, submitAssessment } from "../../actions";
+import { celebrate } from "@/lib/confetti";
 
 type Slide = { id: string; position: number; title: string; body: string };
 type Content = {
@@ -116,7 +117,10 @@ export function LearnClient({
       setResult(r);
       setAnswers({});
       setAssessment(null);
-      if (r.passed) setPhase("done");
+      if (r.passed) {
+        setPhase("done");
+        celebrate();
+      }
     });
   }
 
@@ -143,7 +147,7 @@ export function LearnClient({
     return (
       <div>
         {header}
-        <Card>
+        <Card className="animate-in zoom-in-95 fade-in duration-500">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Award className="size-5" style={accent ? { color: accent } : undefined} />
