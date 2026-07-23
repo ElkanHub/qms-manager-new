@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { Star } from "lucide-react";
-import { requireOrgUser } from "@/lib/auth";
+import { FilePenLine, Star } from "lucide-react";
+import { requireOrgUser, getMyRoles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState } from "@/components/app/empty-state";
 import { DataTable } from "@/components/app/data-table";
 import { ModuleOffAlert } from "@/components/app/module-off-alert";
 import { RoleGate } from "@/components/app/role-gate";
+import { SectionCard } from "@/components/app/section-card";
+import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
 import { columns, type LibraryRow } from "./columns";
 
@@ -20,8 +22,21 @@ export default async function Library({
   searchParams: Promise<{ q?: string; category?: string }>;
 }) {
   const user = await requireOrgUser();
+  const isQA = (await getMyRoles()).includes("qa");
   const { q, category } = await searchParams;
   const supabase = await createClient();
+
+  // In-flight work: documents that exist but are NOT effective yet (a fresh
+  // upload from intake lands here as a draft). Owners see their own; QA sees
+  // everything in flight. Each row links to its actual next step.
+  let inflightQuery = supabase
+    .from("documents")
+    .select("id, document_number, title, status, updated_at, owner_id")
+    .in("status", ["draft", "in_review", "pending_training", "scheduled"])
+    .order("updated_at", { ascending: false })
+    .limit(15);
+  if (!isQA) inflightQuery = inflightQuery.eq("owner_id", user.id);
+  const { data: inflight } = await inflightQuery;
 
   const { data: mod } = await supabase
     .from("tenant_modules")
@@ -92,6 +107,47 @@ export default async function Library({
           detail="Showing a plain fallback list — reading is unaffected."
         />
       )}
+
+      {(inflight ?? []).length > 0 && (
+        <SectionCard
+          title="In-flight documents"
+          description={
+            isQA
+              ? "Everything not yet effective — drafts to finish, reviews in progress, training and scheduled releases."
+              : "Your documents that aren't effective yet. A draft needs you: open it and submit it for review."
+          }
+        >
+          <ul className="divide-y">
+            {(inflight ?? []).map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{d.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.document_number ?? "—"} · updated{" "}
+                    {new Date(d.updated_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <StatusBadge value={d.status} />
+                  {d.status === "draft" ? (
+                    <Button size="sm" asChild>
+                      <Link href={`/documents/${d.id}/draft`}>
+                        <FilePenLine aria-hidden />
+                        Continue draft
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/documents/${d.id}/history`}>Track</Link>
+                    </Button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
+
       <DataTable
         columns={columns}
         data={rows}
